@@ -4,7 +4,7 @@ An EUR-Lex parser for Python.
 
 ## Usage
 
-You can install the package with [`pip`](https://pip.pypa.io/en/stable/installing.html):
+You can install the package with [`pip`](https://pip.pypa.io/en/stable/getting-started/):
 
 ```bash
 pip install eurlex
