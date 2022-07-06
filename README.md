@@ -1,3 +1,10 @@
+<p align="center">
+    [![PyPI version fury.io](https://badge.fury.io/py/ansicolortags.svg)](https://pypi.python.org/pypi/ansicolortags/)
+    <a href=https://github.com/ambv/black>
+        <img src="https://img.shields.io/badge/code%20style-black-000000.svg">
+    </a>
+</p>
+
 # EUR-Lex Parser
 
 An EUR-Lex parser for Python.
