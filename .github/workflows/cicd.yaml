@@ -30,7 +30,7 @@ jobs:
 
       - name: Build and Upload to TestPyPI
         run: |
-          pip3 install wheel
+          pip3 install wheel twine
           python3 setup.py sdist bdist_wheel
           python3 -m twine upload dist/*
         env:
