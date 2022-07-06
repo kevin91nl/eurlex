@@ -488,6 +488,7 @@ def _get_text(child: ETree.Element) -> str:
         return _get_text(child[0])
     if child.text is not None:
         return child.text.strip()
+    return ""
 
 
 def parse_span(child: ETree.Element, ref: list = None, context: dict = None) -> list:
