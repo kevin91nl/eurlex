@@ -41,4 +41,4 @@ For more information about the methods in this package, see the [unit tests](htt
 
 ## Code Contribution
 
-Feel free to send any issues, ideas or pull requests. If you want to commit code, make sure to use `black` to format your code.
+Feel free to send any issues, ideas or pull requests.
