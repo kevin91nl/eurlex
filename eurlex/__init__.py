@@ -640,8 +640,6 @@ def parse_article(tree: ETree.Element, ref: list = None, context: dict = None) -
             pass
         elif get_tag_name(child.tag) == "body":
             output.extend(parse_article(child, ref, context))
-        else:
-            pass
     return output
 
 
