@@ -1,4 +1,4 @@
-name: CICD
+name: Building
 on: [push]
 
 jobs:
