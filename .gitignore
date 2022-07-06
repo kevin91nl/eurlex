@@ -168,3 +168,6 @@ cython_debug/
 # Custom additions:
 # Mac OS X
 .DS_Store
+# Output data
+*.json
+*.html

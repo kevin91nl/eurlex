@@ -434,7 +434,7 @@ def parse_modifiers(
     if child.attrib["class"] == "italic":
         output.append(
             {
-                "text": child.text,
+                "text": _get_text(child),
                 "type": "text",
                 "modifier": "italic",
                 "ref": ref,
@@ -444,7 +444,7 @@ def parse_modifiers(
     elif child.attrib["class"] == "signatory":
         output.append(
             {
-                "text": child.text,
+                "text": _get_text(child),
                 "type": "text",
                 "modifier": "signatory",
                 "ref": ref,
@@ -454,7 +454,7 @@ def parse_modifiers(
     elif child.attrib["class"] == "note":
         output.append(
             {
-                "text": child.text,
+                "text": _get_text(child),
                 "type": "text",
                 "modifier": "note",
                 "ref": ref,
@@ -462,6 +462,32 @@ def parse_modifiers(
             }
         )
     return output
+
+
+def _get_text(child: ETree.Element) -> str:
+    """Get text.
+
+    Parameters
+    ----------
+    child : xml.etree.ElementTree.Element
+        XML tree.
+
+    Returns
+    -------
+    str
+        Text.
+
+    Examples
+    --------
+    >>> _get_text(ETree.fromstring('<p>Text</p>'))
+    'Text'
+    >>> _get_text(ETree.fromstring('<p><span>Text</span></p>'))
+    'Text'
+    """
+    if len(child) == 1:
+        return _get_text(child[0])
+    if child.text is not None:
+        return child.text.strip()
 
 
 def parse_span(child: ETree.Element, ref: list = None, context: dict = None) -> list:
@@ -491,6 +517,8 @@ def parse_span(child: ETree.Element, ref: list = None, context: dict = None) -> 
     [{'text': 'Text', 'type': 'art-title', 'ref': [], 'context': {'article': 'Text'}}]
     >>> parse_span(ETree.fromstring('<p class="ti-grseq-1">Text</p>'))
     [{'text': 'Text', 'type': 'group-title', 'ref': [], 'context': {}}]
+    >>> parse_span(ETree.fromstring('<p class="ti-grseq-1"><span class="bold">Text</span></p>'))
+    [{'text': 'Text', 'type': 'group-title', 'ref': [], 'context': {}}]
     >>> parse_span(ETree.fromstring('<p class="ti-section-1">Text</p>'))
     [{'text': 'Text', 'type': 'section-title', 'ref': [], 'context': {}}]
     >>> parse_span(ETree.fromstring('<p class="normal">1. Text</p>'))
@@ -508,30 +536,30 @@ def parse_span(child: ETree.Element, ref: list = None, context: dict = None) -> 
     if child.attrib["class"] == "doc-ti":
         if "document" not in context:
             context["document"] = ""
-        context["document"] += child.text
+        context["document"] += _get_text(child)
         output.append(
             {
-                "text": child.text,
+                "text": _get_text(child),
                 "type": "doc-title",
                 "ref": ref,
                 "context": context.copy(),
             }
         )
     elif child.attrib["class"] == "sti-art":
-        context["article_subtitle"] = child.text
+        context["article_subtitle"] = _get_text(child)
         output.append(
             {
-                "text": child.text,
+                "text": _get_text(child),
                 "type": "art-subtitle",
                 "ref": ref,
                 "context": context.copy(),
             }
         )
     elif child.attrib["class"] == "ti-art":
-        context["article"] = child.text.replace("Article", "").strip()
+        context["article"] = _get_text(child).replace("Article", "").strip()
         output.append(
             {
-                "text": child.text,
+                "text": _get_text(child),
                 "type": "art-title",
                 "ref": ref,
                 "context": context.copy(),
@@ -540,25 +568,25 @@ def parse_span(child: ETree.Element, ref: list = None, context: dict = None) -> 
     elif child.attrib["class"].startswith("ti-grseq-"):
         output.append(
             {
-                "text": child.text,
+                "text": _get_text(child),
                 "type": "group-title",
                 "ref": ref,
                 "context": context.copy(),
             }
         )
-        context["group"] = child.text
+        context["group"] = _get_text(child)
     elif child.attrib["class"].startswith("ti-section-"):
         output.append(
             {
-                "text": child.text,
+                "text": _get_text(child),
                 "type": "section-title",
                 "ref": ref,
                 "context": context.copy(),
             }
         )
-        context["section"] = child.text
+        context["section"] = _get_text(child)
     elif child.attrib["class"] == "normal":
-        text = child.text
+        text = _get_text(child)
         if re.match("^[0-9]+[.]", text):
             context["paragraph"] = text.split(".")[0]
             text = ".".join(text.split(".")[1:]).strip()
@@ -611,7 +639,7 @@ def parse_article(tree: ETree.Element, ref: list = None, context: dict = None) -
         if get_tag_name(child.tag) in ["a"]:
             output.append(
                 {
-                    "text": child.text,
+                    "text": _get_text(child),
                     "type": "link",
                     "ref": ref,
                     "context": new_context.copy(),
@@ -630,7 +658,7 @@ def parse_article(tree: ETree.Element, ref: list = None, context: dict = None) -
             ):
                 key = None
                 for subchild in results[0]:
-                    key = subchild.text
+                    key = _get_text(subchild)
                 output.extend(parse_article(results[1], ref + [key], new_context))
             else:
                 pass
@@ -664,6 +692,8 @@ def parse_html(html: str) -> pd.DataFrame:
     []
     >>> parse_html('<html').to_dict(orient='records')
     []
+    >>> parse_html('<html><p class="doc-ti">ANNEX</p><p class="ti-grseq-1"><span>Group</span></p><p class="normal">Text</p></html>').to_dict(orient='records')
+    [{'text': 'Text', 'type': 'text', 'ref': [], 'context': {'document': 'ANNEX', 'group': 'Group'}, 'document': 'ANNEX', 'group': 'Group'}]
     """
     try:
         tree = ETree.fromstring(html)
