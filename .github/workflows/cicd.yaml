@@ -1,9 +1,9 @@
-name: Tests
+name: CICD
 on: [push]
 
 jobs:
   build:
-    name: Run Python Tests
+    name: Run Python Tests and upload to PyPI
     runs-on: ubuntu-latest
 
     steps:
@@ -27,3 +27,14 @@ jobs:
         run: |
           pytest . --doctest-modules --exitfirst --verbose --failed-first \
           --cov=. --cov-report html
+
+      - name: Build and Upload to TestPyPI
+        continue-on-error: true
+        run: |
+          pip3 install wheel twine
+          python3 setup.py sdist bdist_wheel
+          python3 -m twine upload dist/*
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.TWINE_TOKEN }}
+          TWINE_REPOSITORY: pypi
