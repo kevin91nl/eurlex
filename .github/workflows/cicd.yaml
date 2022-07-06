@@ -29,6 +29,7 @@ jobs:
           --cov=. --cov-report html
 
       - name: Build and Upload to TestPyPI
+        continue-on-error: true
         run: |
           pip3 install wheel twine
           python3 setup.py sdist bdist_wheel
