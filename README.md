@@ -1,5 +1,5 @@
 <p align="center">
-    [![PyPI version fury.io](https://badge.fury.io/py/ansicolortags.svg)](https://pypi.python.org/pypi/ansicolortags/)
+    <a href="https://badge.fury.io/py/eurlex"><img src="https://badge.fury.io/py/eurlex.svg" alt="PyPI version" height="18"></a>
     <a href=https://github.com/ambv/black>
         <img src="https://img.shields.io/badge/code%20style-black-000000.svg">
     </a>
