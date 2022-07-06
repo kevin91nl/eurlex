@@ -1,0 +1,7 @@
+argparse==1.4.0
+sparqlwrapper==1.8.5
+pandas==1.2.4
+rdflib==6.0.2
+requests==2.25.1
+bs4==0.0.1
+beautifulsoup4==4.9.3
