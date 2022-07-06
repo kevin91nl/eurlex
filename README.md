@@ -26,9 +26,11 @@ celex_id = "32019R0947"
 html = get_html_by_celex_id(celex_id)
 df = parse_html(html)
 
-# Show the first line of Article 1
+# Get the first line of Article 1
 df_article_1 = df[df.article == "1"]
 df_article_1_line_1 = df_article_1.iloc[0]
+
+# Display the corresponding text
 print(df_article_1_line_1.text)
 >>> "This Regulation lays down detailed provisions for the operation of unmanned aircraft systems as well as for personnel, including remote pilots and organisations involved in those operations."
 ```
