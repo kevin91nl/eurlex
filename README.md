@@ -10,11 +10,32 @@ An EUR-Lex parser for Python.
 
 ## Usage
 
-You can install the package with [`pip`](https://pip.pypa.io/en/stable/getting-started/):
+You can install this package as follows:
 
 ```bash
-pip install eurlex
+pip install -U eurlex
 ```
+
+After installing this package, you can download and parse any document from EUR-Lex:
+
+```python
+from eurlex import get_html_by_celex_id, parse_html
+
+# Retrieve and parse the document with CELEX ID "32019R0947"
+celex_id = "32019R0947"
+html = get_html_by_celex_id(celex_id)
+df = parse_html(html)
+
+# Show the first line of Article 1
+df_article_1 = df[df.article == "1"]
+df_article_1_line_1 = df_article_1.iloc[0]
+print(df_article_1_line_1.text)
+>>> "This Regulation lays down detailed provisions for the operation of unmanned aircraft systems as well as for personnel, including remote pilots and organisations involved in those operations."
+```
+
+Every document on EUR-Lex displays a CELEX number at the top of the page. More information on CELEX numbers can be found on the [EUR-Lex website](https://eur-lex.europa.eu/content/tools/eur-lex-celex-infographic-A3.pdf).
+
+For more information about the methods in this package, see the [unit tests](https://github.com/kevin91nl/eurlex/tree/main/tests) and [doctests](https://github.com/kevin91nl/eurlex/blob/main/eurlex/__init__.py).
 
 ## Code Contribution
 
