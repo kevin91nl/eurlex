@@ -709,13 +709,15 @@ def parse_html(html: str) -> pd.DataFrame:
     return df
 
 
-def get_random_regulations(limit: int = 1000) -> list:
-    """Retrieve random regulations from EUR-Lex.
+def get_regulations(limit: int = -1, shuffle: bool = False) -> list:
+    """Retrieve regulations from EUR-Lex.
 
     Parameters
     ----------
     limit : int
-        The maximum number of regulations to retrieve.
+        The maximum number of regulations to retrieve (default: no limit).
+    shuffle : bool
+        Whether to shuffle the retrieved regulations (default: False).
 
     Returns
     -------
@@ -724,8 +726,9 @@ def get_random_regulations(limit: int = 1000) -> list:
     """
     query = "select ?doc where {?doc cdm:work_has_resource-type <http://publications.europa.eu/"  # pragma: no cover
     query += (
-        "resource/authority/resource-type/REG_IMPL> . } order by rand() limit "
-        + str(limit)
+        "resource/authority/resource-type/REG_IMPL> . }"
+        + (" order by rand()" if shuffle else "")
+        + (" limit " + str(limit) if limit > 0 else "")
     )  # pragma: no cover
     results = run_query(prepend_prefixes(query))  # pragma: no cover
     cellar_ids = []  # pragma: no cover
