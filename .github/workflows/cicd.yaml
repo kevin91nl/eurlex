@@ -1,9 +1,9 @@
-name: Tests
+name: CICD
 on: [push]
 
 jobs:
   build:
-    name: Run Python Tests
+    name: Run Python Tests and upload to PyPI
     runs-on: ubuntu-latest
 
     steps:
@@ -30,6 +30,7 @@ jobs:
 
       - name: Build and Upload to TestPyPI
         run: |
+          pip3 install wheel
           python3 setup.py sdist bdist_wheel
           python3 -m twine upload dist/*
         env:
