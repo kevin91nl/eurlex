@@ -5,7 +5,7 @@ from SPARQLWrapper import SPARQLWrapper, JSON
 import pandas as pd
 import datetime
 from xml.etree import ElementTree as ETree
-
+from typing import List, Dict
 
 def get_prefixes() -> dict:
     """Get a mapping from prefixes to URLs.
@@ -737,6 +737,46 @@ def get_regulations(limit: int = -1, shuffle: bool = False) -> list:
         cellar_ids.append(result["doc"]["value"].split("/")[-1])  # pragma: no cover
     return cellar_ids  # pragma: no cover
 
+def get_documents(types: List[str] = ["REG"], limit: int = -1) -> List[Dict[str, str]]:
+    """Retrieve a list of of documents of specified types from EUR-Lex that have a CELEX-number, as a list of dicts.
+
+    Parameters
+    ----------
+    types : List[str]
+        The by the SparQL-API recognized type of documents to return
+        Examples: ["DIR", "DIR_IMPL", "DIR_DEL", "REG", "REG_IMPL", "REG_FINANC", "REG_DEL"]
+    limit : int
+        The maximum number of regulations to retrieve. (default: no limit).
+
+    Returns
+    -------
+    List[dict]
+        A list of dicts, containing publication date, publication url, celex number and type of document.
+    """
+    query  = "select distinct ?doc ?type ?celex ?date\n"
+    query += "where{ ?doc cdm:work_has_resource-type ?type.\n"
+    query += "  FILTER(\n    "
+    query += " ||\n    ".join(map(lambda type: f"?type=<http://publications.europa.eu/resource/authority/resource-type/{type}>", types)) 
+    query += "\n  )\n"
+    query += "  FILTER(BOUND(?celex))\n"
+    query += "  OPTIONAL{?doc cdm:resource_legal_id_celex ?celex.}\n"
+    query += "  OPTIONAL{?doc cdm:work_date_document ?date.}\n"
+    query += "}\n"
+    if (limit > 0):
+        query += "limit " + str(limit)
+
+    results = []
+    query_results = run_query(prepend_prefixes(query))
+        
+    for result in query_results["results"]["bindings"]:
+        results.append({
+            "celex": result["celex"]["value"],
+            "date": result["date"]["value"],
+            "link": result["doc"]["value"],
+            "type": result["type"]["value"].split("/")[-1]
+        })
+
+    return results    
 
 def process_paragraphs(paragraphs: list) -> pd.DataFrame:
     """Process the paragraphs.
