@@ -698,7 +698,14 @@ def parse_html(html: str) -> pd.DataFrame:
     [{'text': 'Text', 'type': 'text', 'ref': [], 'context': {'document': 'ANNEX', 'group': 'Group'}, 'document': 'ANNEX', 'group': 'Group'}]
     """
     try:
-        tree = ETree.fromstring(html)
+        # Replace the super note-tag element with [LINK = <text>]
+        modified_html = re.sub(
+            r'<a[^>]*>\(<span class="super note-tag">([^<]*)</span>\)</a>',
+            r'[LINK = \1]',
+            html
+        )
+        # Parse the modified HTML using ElementTree
+        tree = ETree.fromstring(modified_html)
     except ETree.ParseError:
         return pd.DataFrame()
     records = []
