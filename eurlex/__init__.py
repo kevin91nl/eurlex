@@ -328,6 +328,8 @@ def get_html_by_cellar_id(cellar_id: str, language: str = "en") -> str:
     ----------
     cellar_id : str
         The CELLAR ID to find HTML for.
+    language : str
+        The language to retrieve the HTML in (default: "en").
 
     Returns
     -------
@@ -356,6 +358,9 @@ def get_html_by_celex_id(celex_id: str, language: str = "en") -> str:
     ----------
     celex_id : str
         The CELEX ID to find HTML for.
+    language : str
+        The language to retrieve the HTML in (default: "en").
+
 
     Returns
     -------
