@@ -321,7 +321,7 @@ def simplify_iri(iri: str) -> str:
     return iri
 
 
-def get_html_by_cellar_id(cellar_id: str) -> str:
+def get_html_by_cellar_id(cellar_id: str, language: str = "en") -> str:
     """Retrieve HTML by CELLAR ID.
 
     Parameters
@@ -342,14 +342,14 @@ def get_html_by_cellar_id(cellar_id: str) -> str:
         allow_redirects=True,
         headers={  # pragma: no cover
             "Accept": "text/html,application/xhtml+xml,application/xml",  # pragma: no cover
-            "Accept-Language": "en",  # pragma: no cover
+            "Accept-Language": f"{language}",  # pragma: no cover
         },
     )  # pragma: no cover
     html = response.content.decode("utf-8")  # pragma: no cover
     return html  # pragma: no cover
 
 
-def get_html_by_celex_id(celex_id: str) -> str:
+def get_html_by_celex_id(celex_id: str, language: str = "en") -> str:
     """Retrieve HTML by CELEX ID.
 
     Parameters
@@ -370,7 +370,7 @@ def get_html_by_celex_id(celex_id: str) -> str:
         allow_redirects=True,
         headers={  # pragma: no cover
             "Accept": "text/html,application/xhtml+xml,application/xml",  # pragma: no cover
-            "Accept-Language": "en",  # pragma: no cover
+            "Accept-Language": f"{language}",  # pragma: no cover
         },
     )  # pragma: no cover
     html = response.content.decode("utf-8")  # pragma: no cover
