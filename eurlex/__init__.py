@@ -6,6 +6,7 @@ import pandas as pd
 import datetime
 from xml.etree import ElementTree as ETree
 from typing import List, Dict
+from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
 
 
 def get_prefixes() -> dict:
@@ -24,6 +25,69 @@ def get_prefixes() -> dict:
         "cellar": "http://publications.europa.eu/resource/cellar/",
         "skos": "http://www.w3.org/2004/02/skos/core#",
     }
+
+
+def _normalize_language(language: str) -> dict:
+    """Normalize language codes for headers, query params, and stream matching."""
+    if not isinstance(language, str) or not language.strip():
+        return {"header": "", "query": "", "stream": ""}
+    lang = language.strip().lower()
+    if "-" in lang:
+        lang = lang.split("-")[0]
+
+    iso2_to_iso3 = {
+        "bg": "bul",
+        "cs": "ces",
+        "da": "dan",
+        "de": "deu",
+        "el": "ell",
+        "en": "eng",
+        "es": "spa",
+        "et": "est",
+        "fi": "fin",
+        "fr": "fra",
+        "ga": "gle",
+        "hr": "hrv",
+        "hu": "hun",
+        "it": "ita",
+        "lt": "lit",
+        "lv": "lav",
+        "mt": "mlt",
+        "nl": "nld",
+        "pl": "pol",
+        "pt": "por",
+        "ro": "ron",
+        "sk": "slk",
+        "sl": "slv",
+        "sv": "swe",
+        "no": "nor",
+    }
+    iso3_to_iso2 = {value: key for key, value in iso2_to_iso3.items()}
+
+    if len(lang) == 2:
+        header = lang
+        query = iso2_to_iso3.get(lang, "")
+        stream = lang.upper()
+    elif len(lang) == 3:
+        header = iso3_to_iso2.get(lang, lang)
+        query = lang
+        stream = iso3_to_iso2.get(lang, "").upper()
+    else:
+        header = lang
+        query = ""
+        stream = ""
+    return {"header": header, "query": query, "stream": stream}
+
+
+def _add_query_param(url: str, key: str, value: str) -> str:
+    if not value:
+        return url
+    parts = urlsplit(url)
+    query = dict(parse_qsl(parts.query))
+    if query.get(key) == value:
+        return url
+    query[key] = value
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
 
 
 def parse_article_paragraphs(article: str) -> dict:
@@ -336,19 +400,98 @@ def get_html_by_cellar_id(cellar_id: str, language: str = "en") -> str:
     str
         HTML found using the CELLAR ID.
     """
+    lang = _normalize_language(language)
     url = "http://publications.europa.eu/resource/cellar/" + str(  # pragma: no cover
         cellar_id.split(":")[1] if ":" in cellar_id else cellar_id  # pragma: no cover
     )  # pragma: no cover
+    url = _add_query_param(url, "language", lang["query"])
     response = requests.get(
         url,
         allow_redirects=True,
         headers={  # pragma: no cover
             "Accept": "text/html,application/xhtml+xml,application/xml",  # pragma: no cover
-            "Accept-Language": f"{language}",  # pragma: no cover
+            "Accept-Language": f"{lang['header']}",  # pragma: no cover
         },
     )  # pragma: no cover
     html = response.content.decode("utf-8")  # pragma: no cover
     return html  # pragma: no cover
+
+
+def _parse_multichoice_html(html: str) -> list:
+    """Parse a 300 Multiple-Choice response into candidate documents."""
+    items = []
+    try:
+        from lxml import html as lxml_html
+
+        tree = lxml_html.fromstring(html)
+        for li in tree.xpath("//li[@title='item']"):
+            hrefs = li.xpath(".//a/@href")
+            if not hrefs:
+                continue
+            href = hrefs[0]
+            label = "".join(li.xpath(".//li[@title='stream_label']/text()"))
+            name = "".join(li.xpath(".//li[@title='stream_name']/text()"))
+            order_text = "".join(li.xpath(".//li[@title='stream_order']/text()"))
+            try:
+                order = int(order_text) if order_text else None
+            except ValueError:
+                order = None
+            items.append({"href": href, "label": label, "name": name, "order": order})
+        if items:
+            return items
+    except Exception:
+        pass
+
+    pattern = re.compile(
+        r"<li\s+title=\"item\">.*?<a\s+href=\"(?P<href>[^\"]+)\".*?"
+        r"<li\s+title=\"stream_name\">(?P<name>[^<]*)</li>.*?"
+        r"<li\s+title=\"stream_label\">(?P<label>[^<]*)</li>.*?"
+        r"<li\s+title=\"stream_order\"[^>]*>(?P<order>[^<]*)</li>",
+        re.DOTALL,
+    )
+    for match in pattern.finditer(html):
+        order_text = match.group("order")
+        try:
+            order = int(order_text) if order_text else None
+        except ValueError:
+            order = None
+        items.append(
+            {
+                "href": match.group("href"),
+                "label": match.group("label"),
+                "name": match.group("name"),
+                "order": order,
+            }
+        )
+    if items:
+        return items
+
+    for href in re.findall(r"href=\"([^\"]+)\"", html):
+        items.append({"href": href, "label": "", "name": "", "order": None})
+    return items
+
+
+def _select_multichoice_url(items: list, language: str = "en") -> str:
+    """Select the best document URL from a multiple-choice list."""
+    if not items:
+        return ""
+    lang = _normalize_language(language)["stream"]
+
+    def sort_key(item: dict) -> tuple:
+        label = (item.get("label") or "").lower()
+        name = item.get("name") or ""
+        order = item.get("order")
+        lang_match = bool(lang) and f"_{lang}_" in name.upper()
+        is_html = name.lower().endswith(".html")
+        return (
+            0 if label == "act" else 1,
+            0 if lang_match else 1,
+            0 if is_html else 1,
+            order if order is not None else 999,
+            name,
+        )
+
+    return sorted(items, key=sort_key)[0].get("href", "")
 
 
 def get_html_by_celex_id(celex_id: str, language: str = "en") -> str:
@@ -367,18 +510,34 @@ def get_html_by_celex_id(celex_id: str, language: str = "en") -> str:
     str
         HTML found using the CELEX ID.
     """
+    lang = _normalize_language(language)
     url = "http://publications.europa.eu/resource/celex/" + str(
         celex_id
     )  # pragma: no cover
+    url = _add_query_param(url, "language", lang["query"])
     response = requests.get(
         url,
         allow_redirects=True,
         headers={  # pragma: no cover
             "Accept": "text/html,application/xhtml+xml,application/xml",  # pragma: no cover
-            "Accept-Language": f"{language}",  # pragma: no cover
+            "Accept-Language": f"{lang['header']}",  # pragma: no cover
         },
     )  # pragma: no cover
     html = response.content.decode("utf-8")  # pragma: no cover
+    if response.status_code == 300 or "Multiple-Choice Response" in html:
+        items = _parse_multichoice_html(html)
+        selected = _select_multichoice_url(items, language=language)
+        if selected:
+            selected = _add_query_param(selected, "language", lang["query"])
+            response = requests.get(
+                selected,
+                allow_redirects=True,
+                headers={
+                    "Accept": "text/html,application/xhtml+xml,application/xml",
+                    "Accept-Language": f"{lang['header']}",
+                },
+            )
+            html = response.content.decode("utf-8")
     return html  # pragma: no cover
 
 

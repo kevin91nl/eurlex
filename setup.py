@@ -6,7 +6,7 @@ long_description = (this_directory / "README.md").read_text()
 
 setuptools.setup(
     name="eurlex",
-    version="0.1.6",
+    version="0.1.7",
     author="K.M.J. Jacobs",
     author_email="kmj.jacobs@maastrichtuniversity.nl",
     description="An EUR-Lex parser for Python.",

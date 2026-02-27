@@ -118,6 +118,73 @@ def test_parse_html_lxml_exception(monkeypatch):
     assert df.empty
 
 
+def test_parse_multichoice_html_and_selection():
+    html = (
+        "<html><head><title>300 Multiple-Choice Response</title></head><body>"
+        "List of URI's:<ul><li title=\"manifestation\">cellar:test<ul>"
+        "<li title=\"item\"><a href=\"http://example.com/DOC_1\">"
+        "<span class=\"url\">(http://example.com/DOC_1)</span></a>"
+        "<ul><li title=\"stream_name\">1_EN_ACT_part1_v7.html</li>"
+        "<li title=\"stream_label\">act</li>"
+        "<li title=\"stream_order\" id=\"streamOrder\">1</li></ul></li>"
+        "<li title=\"item\"><a href=\"http://example.com/DOC_3\">"
+        "<span class=\"url\">(http://example.com/DOC_3)</span></a>"
+        "<ul><li title=\"stream_name\">1_EN_annexe_proposition_part1_v7.html</li>"
+        "<li title=\"stream_label\">act</li>"
+        "<li title=\"stream_order\" id=\"streamOrder\">3</li></ul></li>"
+        "</ul></li></ul></body></html>"
+    )
+    items = eurlex._parse_multichoice_html(html)
+    assert len(items) == 2
+    selected = eurlex._select_multichoice_url(items, language="en")
+    assert selected == "http://example.com/DOC_1"
+
+
+def test_normalize_language_maps_sv():
+    norm = eurlex._normalize_language("sv")
+    assert norm["header"] == "sv"
+    assert norm["query"] == "swe"
+    assert norm["stream"] == "SV"
+
+
+def test_get_html_by_celex_id_multichoice_language_param(monkeypatch):
+    multichoice_html = (
+        "<html><head><title>300 Multiple-Choice Response</title></head><body>"
+        "List of URI's:<ul><li title=\"manifestation\">cellar:test<ul>"
+        "<li title=\"item\"><a href=\"http://example.com/DOC_1\">"
+        "<span class=\"url\">(http://example.com/DOC_1)</span></a>"
+        "<ul><li title=\"stream_name\">1_EN_ACT_part1_v7.html</li>"
+        "<li title=\"stream_label\">act</li>"
+        "<li title=\"stream_order\" id=\"streamOrder\">1</li></ul></li>"
+        "<li title=\"item\"><a href=\"http://example.com/DOC_2\">"
+        "<span class=\"url\">(http://example.com/DOC_2)</span></a>"
+        "<ul><li title=\"stream_name\">1_SV_ACT_part1_v7.html</li>"
+        "<li title=\"stream_label\">act</li>"
+        "<li title=\"stream_order\" id=\"streamOrder\">1</li></ul></li>"
+        "</ul></li></ul></body></html>"
+    )
+    calls = []
+
+    class FakeResponse:
+        def __init__(self, content: str, status_code: int = 200):
+            self.content = content.encode("utf-8")
+            self.status_code = status_code
+
+    def fake_get(url, allow_redirects=True, headers=None):
+        calls.append((url, headers))
+        if "resource/celex/" in url:
+            return FakeResponse(multichoice_html, status_code=300)
+        return FakeResponse("<html><body><p class='normal'>Hej</p></body></html>")
+
+    monkeypatch.setattr(eurlex.requests, "get", fake_get)
+    html = eurlex.get_html_by_celex_id("52021PC0206", language="sv")
+    assert "Hej" in html
+    assert any(
+        url.startswith("http://example.com/DOC_2") and "language=swe" in url
+        for url, _ in calls
+    )
+
+
 def test_get_regulations_uses_run_query(monkeypatch):
     def fake_run_query(_):
         return {
