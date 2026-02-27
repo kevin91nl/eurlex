@@ -26,7 +26,7 @@ jobs:
       - name: Test with pytest
         run: |
           pytest . --doctest-modules --exitfirst --verbose --failed-first \
-          --cov=. --cov-report html --cov-fail-under=100
+          --cov=eurlex --cov-report html --cov-fail-under=100
 
       - name: Build and Upload to TestPyPI
         continue-on-error: true
