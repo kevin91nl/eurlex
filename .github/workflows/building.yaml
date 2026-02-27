@@ -1,9 +1,13 @@
-name: Building
-on: [push]
+name: CI
+on:
+  push:
+  workflow_dispatch:
+  release:
+    types: [published]
 
 jobs:
-  build:
-    name: Run Python Tests and upload to PyPI
+  tests:
+    name: Run Python Tests
     runs-on: ubuntu-latest
 
     steps:
@@ -28,13 +32,26 @@ jobs:
           pytest . --doctest-modules --exitfirst --verbose --failed-first \
           --cov=eurlex --cov-report html --cov-fail-under=100
 
-      - name: Build and Upload to TestPyPI
-        continue-on-error: true
+  publish:
+    name: Publish to PyPI
+    needs: tests
+    if: github.event_name == 'release' && github.event.action == 'published'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build distributions
         run: |
-          pip3 install wheel twine
-          python3 setup.py sdist bdist_wheel
-          python3 -m twine upload dist/*
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.TWINE_TOKEN }}
-          TWINE_REPOSITORY: pypi
+          python -m pip install --upgrade build
+          python -m build
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
