@@ -727,7 +727,14 @@ def parse_html(html: str) -> pd.DataFrame:
     """
     tree = None
     try:
-        tree = ETree.fromstring(html)
+        # Replace the super note-tag element with [LINK = <text>]
+        modified_html = re.sub(
+            r'<a[^>]*>\(<span class="super note-tag">([^<]*)</span>\)</a>',
+            r'[LINK = \1]',
+            html
+        )
+        # Parse the modified HTML using ElementTree
+        tree = ETree.fromstring(modified_html)
     except ETree.ParseError:
         # EUR-Lex sometimes returns valid HTML that is not strict XML.
         # Fall back to a tolerant HTML parser to keep extraction working.
