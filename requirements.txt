@@ -1,8 +1,6 @@
-argparse~=1.4.0
 sparqlwrapper~=2.0.0
-pandas~=3.0.0
+pandas~=3.0.1
 rdflib~=7.6.0
-requests~=2.32.0
-bs4~=0.0.2
-beautifulsoup4~=4.14.0
-lxml~=6.0.0
+requests~=2.32.5
+beautifulsoup4~=4.14.3
+lxml~=6.0.2

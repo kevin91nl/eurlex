@@ -16,7 +16,7 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     include_package_data=True,
     classifiers=[],
-    python_requires=">=3.6",
+    python_requires=">=3.11",
     # Load the requirements.txt
     install_requires=[
         line.strip()
