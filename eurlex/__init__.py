@@ -400,7 +400,28 @@ def get_tag_name(raw_tag_name: str) -> str:
     >>> get_tag_name('tag}test')
     'test'
     """
+    if not isinstance(raw_tag_name, str):
+        return ""
     return raw_tag_name.split("}")[1] if "}" in raw_tag_name else raw_tag_name
+
+
+def _get_normalized_classes(child: ETree.Element) -> List[str]:
+    """Return normalized CSS classes for an element.
+
+    EUR-Lex currently prefixes classes with ``oj-`` (e.g. ``oj-normal``),
+    while older markup and tests use unprefixed names (e.g. ``normal``).
+    """
+    raw = child.attrib.get("class", "")
+    classes = raw.split()
+    return [name[3:] if name.startswith("oj-") else name for name in classes]
+
+
+def _has_normalized_class(child: ETree.Element, class_name: str) -> bool:
+    return class_name in _get_normalized_classes(child)
+
+
+def _has_normalized_class_prefix(child: ETree.Element, prefix: str) -> bool:
+    return any(name.startswith(prefix) for name in _get_normalized_classes(child))
 
 
 def parse_modifiers(
@@ -437,7 +458,7 @@ def parse_modifiers(
     context = {} if context is None else context
     output = []
     new_context = context.copy()
-    if child.attrib["class"] == "italic":
+    if _has_normalized_class(child, "italic"):
         output.append(
             {
                 "text": _get_text(child),
@@ -447,7 +468,7 @@ def parse_modifiers(
                 "context": new_context.copy(),
             }
         )
-    elif child.attrib["class"] == "signatory":
+    elif _has_normalized_class(child, "signatory"):
         output.append(
             {
                 "text": _get_text(child),
@@ -457,7 +478,7 @@ def parse_modifiers(
                 "context": new_context.copy(),
             }
         )
-    elif child.attrib["class"] == "note":
+    elif _has_normalized_class(child, "note"):
         output.append(
             {
                 "text": _get_text(child),
@@ -540,7 +561,7 @@ def parse_span(child: ETree.Element, ref: list = None, context: dict = None) -> 
     output = []
     if "class" not in child.attrib:
         return output
-    if child.attrib["class"] == "doc-ti":
+    if _has_normalized_class(child, "doc-ti"):
         if "document" not in context:
             context["document"] = ""
         context["document"] += _get_text(child)
@@ -552,7 +573,7 @@ def parse_span(child: ETree.Element, ref: list = None, context: dict = None) -> 
                 "context": context.copy(),
             }
         )
-    elif child.attrib["class"] == "sti-art":
+    elif _has_normalized_class(child, "sti-art"):
         context["article_subtitle"] = _get_text(child)
         output.append(
             {
@@ -562,7 +583,7 @@ def parse_span(child: ETree.Element, ref: list = None, context: dict = None) -> 
                 "context": context.copy(),
             }
         )
-    elif child.attrib["class"] == "ti-art":
+    elif _has_normalized_class(child, "ti-art"):
         context["article"] = _get_text(child).replace("Article", "").strip()
         output.append(
             {
@@ -572,7 +593,7 @@ def parse_span(child: ETree.Element, ref: list = None, context: dict = None) -> 
                 "context": context.copy(),
             }
         )
-    elif child.attrib["class"].startswith("ti-grseq-"):
+    elif _has_normalized_class_prefix(child, "ti-grseq-"):
         output.append(
             {
                 "text": _get_text(child),
@@ -582,7 +603,7 @@ def parse_span(child: ETree.Element, ref: list = None, context: dict = None) -> 
             }
         )
         context["group"] = _get_text(child)
-    elif child.attrib["class"].startswith("ti-section-"):
+    elif _has_normalized_class_prefix(child, "ti-section-"):
         output.append(
             {
                 "text": _get_text(child),
@@ -592,7 +613,7 @@ def parse_span(child: ETree.Element, ref: list = None, context: dict = None) -> 
             }
         )
         context["section"] = _get_text(child)
-    elif child.attrib["class"] == "normal":
+    elif _has_normalized_class(child, "normal"):
         text = _get_text(child)
         if re.match("^[0-9]+[.]", text):
             context["paragraph"] = text.split(".")[0]
@@ -641,7 +662,9 @@ def parse_article(tree: ETree.Element, ref: list = None, context: dict = None) -
     ref = [] if ref is None else ref
     context = {} if context is None else context
     output = []
-    new_context = context.copy()
+    # Keep one mutable context while traversing sibling nodes so titles/subtitles
+    # discovered in nested containers remain available for subsequent content.
+    new_context = context
     for child in tree:
         if get_tag_name(child.tag) in ["a"]:
             output.append(
@@ -702,10 +725,18 @@ def parse_html(html: str) -> pd.DataFrame:
     >>> parse_html('<html><p class="doc-ti">ANNEX</p><p class="ti-grseq-1"><span>Group</span></p><p class="normal">Text</p></html>').to_dict(orient='records')
     [{'text': 'Text', 'type': 'text', 'ref': [], 'context': {'document': 'ANNEX', 'group': 'Group'}, 'document': 'ANNEX', 'group': 'Group'}]
     """
+    tree = None
     try:
         tree = ETree.fromstring(html)
     except ETree.ParseError:
-        return pd.DataFrame()
+        # EUR-Lex sometimes returns valid HTML that is not strict XML.
+        # Fall back to a tolerant HTML parser to keep extraction working.
+        try:
+            from lxml import html as lxml_html
+
+            tree = lxml_html.fromstring(html)
+        except Exception:
+            return pd.DataFrame()
     records = []
     for item in parse_article(tree):
         for key, value in item["context"].items():
