@@ -776,7 +776,7 @@ def get_regulations(limit: int = -1, shuffle: bool = False) -> list:
 
 
 def get_documents(types: List[str] = ["REG"], limit: int = -1) -> List[Dict[str, str]]:
-    """Retrieve a list of of documents of specified types from EUR-Lex that have a CELEX-number, as a list of dicts.
+    """Retrieve a list of documents of specified types from EUR-Lex that have a CELEX-number, as a list of dicts.
 
     Parameters
     ----------
