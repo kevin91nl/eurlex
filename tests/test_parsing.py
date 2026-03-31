@@ -54,9 +54,28 @@ def test_get_text_empty_multiple_children():
     assert eurlex._get_text(child) == ""
 
 
-def test_parse_span_no_class_returns_empty():
+def test_get_text_multiple_children_with_text():
+    child = ETree.fromstring("<p>Pre <span>mid</span> post</p>")
+    assert eurlex._get_text(child) == "Pre mid post"
+
+
+def test_parse_span_no_class_extracts_text():
     child = ETree.fromstring("<p>Text</p>")
+    assert eurlex.parse_span(child) == [
+        {"text": "Text", "type": "text", "ref": [], "context": {}}
+    ]
+
+
+def test_parse_span_no_class_empty_returns_empty():
+    child = ETree.fromstring("<p></p>")
     assert eurlex.parse_span(child) == []
+
+
+def test_parse_span_unrecognized_class_extracts_text():
+    child = ETree.fromstring("<p class='MsoNormal'>Text</p>")
+    assert eurlex.parse_span(child) == [
+        {"text": "Text", "type": "text", "ref": [], "context": {}}
+    ]
 
 
 def test_parse_article_table_ref():
@@ -90,6 +109,42 @@ def test_parse_html_basic():
     assert df.to_dict(orient="records") == [
         {"text": "Text", "type": "text", "ref": [], "context": {}}
     ]
+
+
+def test_parse_html_old_style_no_class():
+    """Old EUR-Lex documents may use plain <p> elements without CSS classes."""
+    html = (
+        "<html><body>"
+        "<p>Member States shall take all appropriate measures.</p>"
+        "</body></html>"
+    )
+    df = eurlex.parse_html(html)
+    assert not df.empty
+    assert "Member States shall take all appropriate measures." in df.text.values
+
+
+def test_parse_html_old_style_unrecognized_class():
+    """Old EUR-Lex documents may use Word-converted CSS classes like MsoNormal."""
+    html = (
+        "<html><body>"
+        "<p class='MsoNormal'>Member States shall take all appropriate measures.</p>"
+        "</body></html>"
+    )
+    df = eurlex.parse_html(html)
+    assert not df.empty
+    assert "Member States shall take all appropriate measures." in df.text.values
+
+
+def test_parse_html_mixed_content_text():
+    """Text spread across inline child elements should be extracted correctly."""
+    html = (
+        "<html><body>"
+        "<p class='normal'>Pre <span>mid</span> post</p>"
+        "</body></html>"
+    )
+    df = eurlex.parse_html(html)
+    assert not df.empty
+    assert df.text.values[0] == "Pre mid post"
 
 
 def test_parse_html_note_tag_replacement():

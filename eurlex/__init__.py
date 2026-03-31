@@ -669,12 +669,10 @@ def _get_text(child: ETree.Element) -> str:
     'Text'
     >>> _get_text(ETree.fromstring('<p><span>Text</span></p>'))
     'Text'
+    >>> _get_text(ETree.fromstring('<p>Pre <span>mid</span> post</p>'))
+    'Pre mid post'
     """
-    if len(child) == 1:
-        return _get_text(child[0])
-    if child.text is not None:
-        return child.text.strip()
-    return ""
+    return "".join(child.itertext()).strip()
 
 
 def parse_span(child: ETree.Element, ref: list = None, context: dict = None) -> list:
@@ -713,12 +711,19 @@ def parse_span(child: ETree.Element, ref: list = None, context: dict = None) -> 
     >>> parse_span(ETree.fromstring('<p class="italic">Text</p>'))
     [{'text': 'Text', 'type': 'text', 'modifier': 'italic', 'ref': [], 'context': {}}]
     >>> parse_span(ETree.fromstring('<p>Text</p>'))
+    [{'text': 'Text', 'type': 'text', 'ref': [], 'context': {}}]
+    >>> parse_span(ETree.fromstring('<p class="MsoNormal">Text</p>'))
+    [{'text': 'Text', 'type': 'text', 'ref': [], 'context': {}}]
+    >>> parse_span(ETree.fromstring('<p></p>'))
     []
     """
     ref = [] if ref is None else ref
     context = {} if context is None else context
     output = []
     if "class" not in child.attrib:
+        text = _get_text(child)
+        if text:
+            output.append({"text": text, "type": "text", "ref": ref, "context": context.copy()})
         return output
     if _has_normalized_class(child, "doc-ti"):
         if "document" not in context:
@@ -781,7 +786,13 @@ def parse_span(child: ETree.Element, ref: list = None, context: dict = None) -> 
             {"text": text, "type": "text", "ref": ref, "context": context.copy()}
         )
     else:
-        output.extend(parse_modifiers(child, ref, context))
+        modifier_results = parse_modifiers(child, ref, context)
+        if modifier_results:
+            output.extend(modifier_results)
+        else:
+            text = _get_text(child)
+            if text:
+                output.append({"text": text, "type": "text", "ref": ref, "context": context.copy()})
     return output
 
 
