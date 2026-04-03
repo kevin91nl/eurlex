@@ -254,6 +254,16 @@ def test_parse_article_hr_branch():
     assert eurlex.parse_article(tree) == []
 
 
+def test_parse_article_plain_paragraph_empty_returns_no_records():
+    tree = ETree.fromstring("<html><p>   </p></html>")
+    assert eurlex.parse_article(tree) == []
+
+
+def test_parse_article_unknown_tag_returns_empty():
+    tree = ETree.fromstring("<html><custom>Text</custom></html>")
+    assert eurlex.parse_article(tree) == []
+
+
 def test_parse_html_basic():
     df = eurlex.parse_html("<html><body><p class='normal'>Text</p></body></html>")
     assert df.to_dict(orient="records") == [
