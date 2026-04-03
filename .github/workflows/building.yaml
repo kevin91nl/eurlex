@@ -1,61 +1,61 @@
 name: CI
 on:
-  push:
-  workflow_dispatch:
-  release:
-    types: [published]
+    push:
+    workflow_dispatch:
+    release:
+        types: [published]
 
 jobs:
-  tests:
-    name: Run Python Tests
-    runs-on: ubuntu-latest
+    tests:
+        name: Run Python Tests
+        runs-on: ubuntu-latest
 
-    steps:
-      - uses: actions/checkout@v4
+        steps:
+            - uses: actions/checkout@v4
 
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
+            - name: Set up Python 3.12
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.12"
 
-      - name: Cache pre-commit environments
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pre-commit
-          key: pre-commit-${{ runner.os }}-py312-${{ hashFiles('.pre-commit-config.yaml') }}
-          restore-keys: |
-            pre-commit-${{ runner.os }}-py312-
+            - name: Cache pre-commit environments
+              uses: actions/cache@v4
+              with:
+                  path: ~/.cache/pre-commit
+                  key: pre-commit-${{ runner.os }}-py312-${{ hashFiles('.pre-commit-config.yaml') }}
+                  restore-keys: |
+                      pre-commit-${{ runner.os }}-py312-
 
-      - name: Install pre-commit
-        run: |
-          python3 -m pip install --upgrade pip
-          python3 -m pip install --upgrade pre-commit
+            - name: Install pre-commit
+              run: |
+                  python3 -m pip install --upgrade pip
+                  python3 -m pip install --upgrade pre-commit
 
-      - name: Run pre-commit hooks
-        run: |
-          pre-commit run --all-files --show-diff-on-failure
+            - name: Run pre-commit hooks
+              run: |
+                  pre-commit run --all-files --show-diff-on-failure
 
-  publish:
-    name: Publish to PyPI
-    needs: tests
-    if: github.event_name == 'release' && github.event.action == 'published'
-    runs-on: ubuntu-latest
-    environment: pypi
-    permissions:
-      id-token: write
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
+    publish:
+        name: Publish to PyPI
+        needs: tests
+        if: github.event_name == 'release' && github.event.action == 'published'
+        runs-on: ubuntu-latest
+        environment: pypi
+        permissions:
+            id-token: write
+            contents: read
+        steps:
+            - uses: actions/checkout@v4
 
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
+            - name: Set up Python 3.12
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.12"
 
-      - name: Build distributions
-        run: |
-          python -m pip install --upgrade build
-          python -m build
+            - name: Build distributions
+              run: |
+                  python -m pip install --upgrade build
+                  python -m build
 
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+            - name: Publish to PyPI
+              uses: pypa/gh-action-pypi-publish@release/v1
