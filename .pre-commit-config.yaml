@@ -101,7 +101,7 @@ repos:
 
       - id: vulture-dead-code
         name: vulture (dead code)
-        entry: vulture src/eurlex --min-confidence 80 --exclude src/eurlex/__init__.py,src/eurlex/api.py,src/eurlex/public.py,src/eurlex/utils.py,src/eurlex/xml.py
+        entry: vulture src/eurlex --min-confidence 80 --exclude src/eurlex/__init__.py,src/eurlex/public.py,src/eurlex/utils.py,src/eurlex/xml.py
         language: python
         additional_dependencies:
           - vulture
