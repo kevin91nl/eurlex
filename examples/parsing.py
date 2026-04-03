@@ -1,11 +1,22 @@
 from __future__ import annotations
 
+from typing import TypedDict
 from xml.etree import ElementTree as ETree
 
 import eurlex.parser as parser
 
 
-def run_example() -> dict[str, object]:
+class ParsingExampleResult(TypedDict):
+    records: list[dict[str, object]]
+    paragraphs: dict[str | None, str]
+    processed: list[dict[str, object]]
+    article_rows: list[dict[str, object]]
+    no_modifier: list[dict[str, object]]
+    empty_processed: bool
+    missing_column_processed: list[str]
+
+
+def run_example() -> ParsingExampleResult:
     structured_html = (
         "<html><body>"
         "<p class='oj-doc-ti'>Modern Regulation</p>"
@@ -48,4 +59,4 @@ def run_example() -> dict[str, object]:
     }
 
 
-__all__ = ["run_example"]
+__all__ = ["ParsingExampleResult", "run_example"]

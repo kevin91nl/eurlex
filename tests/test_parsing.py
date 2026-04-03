@@ -41,7 +41,11 @@ def test_simplify_iri_converts_known_prefix():
 
 
 def test_run_query_uses_sparqlwrapper(monkeypatch):
-    fake_module = types.ModuleType("SPARQLWrapper")
+    class FakeModule(types.ModuleType):
+        JSON: object
+        SPARQLWrapper: type[object]
+
+    fake_module = FakeModule("SPARQLWrapper")
 
     class FakeQueryResult:
         def convert(self):
@@ -341,6 +345,11 @@ def test_parse_html_lxml_exception(monkeypatch):
 
     monkeypatch.setattr(lxml.html, "fromstring", boom)
     df = eurlex.parse_html("<html><p>")
+    assert df.empty
+
+
+def test_parse_html_empty_document_returns_empty_dataframe():
+    df = eurlex.parse_html("<html><body></body></html>")
     assert df.empty
 
 

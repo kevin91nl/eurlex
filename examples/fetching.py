@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from typing import TypedDict
 
 import eurlex.fetch as fetch
 
@@ -9,6 +10,15 @@ class _FakeResponse:
     def __init__(self, content: str, status_code: int = 200):
         self.content = content.encode("utf-8")
         self.status_code = status_code
+
+
+class FetchingExampleResult(TypedDict):
+    celex_html: str
+    cellar_html: str
+    selected_url_en: str
+    selected_url_sv: str
+    parsed_order: int | None
+    call_count: int
 
 
 @contextmanager
@@ -21,7 +31,7 @@ def _patched_requests_get(fake_get):
         fetch.requests.get = original
 
 
-def run_example() -> dict[str, object]:
+def run_example() -> FetchingExampleResult:
     multichoice_html = (
         "<html><head><title>300 Multiple-Choice Response</title></head><body>"
         'List of URI\'s:<ul><li title="manifestation">cellar:test<ul>'
@@ -64,4 +74,4 @@ def run_example() -> dict[str, object]:
     }
 
 
-__all__ = ["run_example"]
+__all__ = ["FetchingExampleResult", "run_example"]

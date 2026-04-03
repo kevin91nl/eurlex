@@ -21,6 +21,34 @@ repos:
         args: [--fix]
       - id: ruff-format
 
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.18.2
+    hooks:
+      - id: mypy
+        args: [--config-file=pyproject.toml]
+        additional_dependencies:
+          - pandas~=3.0.1
+          - rdflib~=7.6.0
+          - defusedxml~=0.7.1
+          - requests~=2.33.0
+          - types-requests
+          - lxml~=6.0.2
+          - SPARQLWrapper~=2.0.0
+
+  - repo: https://github.com/RobertCraigie/pyright-python
+    rev: v1.1.407
+    hooks:
+      - id: pyright
+        additional_dependencies:
+          - pandas~=3.0.1
+          - rdflib~=7.6.0
+          - defusedxml~=0.7.1
+          - requests~=2.33.0
+          - types-requests
+          - lxml~=6.0.2
+          - SPARQLWrapper~=2.0.0
+          - pytest-readme
+
   - repo: https://github.com/PyCQA/bandit
     rev: 1.9.4
     hooks:
@@ -47,7 +75,7 @@ repos:
     hooks:
       - id: import-cruiser-architecture-graph
         name: import-cruiser (architecture graph)
-        entry: import-cruiser export src/eurlex --format svg --show-loc --style depcruise --cluster-mode module --cluster-depth 1 --include-external-deps --output docs/architecture/dependency-graph.svg
+        entry: import-cruiser analyze src --format svg --show-loc --style depcruise --cluster-mode module --cluster-depth 2 --include-external-deps --output docs/architecture/dependency-graph.svg
         language: python
         additional_dependencies:
           - import-cruiser
@@ -66,8 +94,16 @@ repos:
           - pandas
           - rdflib
           - requests
-          - beautifulsoup4
           - lxml
           - SPARQLWrapper
+        pass_filenames: false
+        always_run: true
+
+      - id: vulture-dead-code
+        name: vulture (dead code)
+        entry: vulture src/eurlex --min-confidence 80 --exclude src/eurlex/__init__.py,src/eurlex/api.py,src/eurlex/public.py,src/eurlex/utils.py,src/eurlex/xml.py
+        language: python
+        additional_dependencies:
+          - vulture
         pass_filenames: false
         always_run: true

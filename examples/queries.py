@@ -2,10 +2,28 @@ from __future__ import annotations
 
 import sys
 from contextlib import contextmanager
-from types import SimpleNamespace
+from types import ModuleType
+from typing import Callable, TypedDict
 
 import eurlex.celex as celex
 import eurlex.sparql as sparql
+
+
+class QueriesExampleResult(TypedDict):
+    query: str
+    converted: list[dict[str, object]]
+    celex_id: str
+    possible_ids: list[str]
+    celex_frame: list[dict[str, object]]
+    guessed: list[str]
+    regulations: list[str]
+    documents: list[dict[str, str]]
+    fallback_prefixed_query: dict[str, str]
+
+
+class _FakeEurlexModule(ModuleType):
+    prepend_prefixes: Callable[[str], str]
+    run_query: Callable[[str], object]
 
 
 class _FakeGraph:
@@ -31,12 +49,11 @@ def _patched_attr(obj, name, value):
 
 
 @contextmanager
-def _patched_package(run_query_result):
+def _patched_package(run_query_result: Callable[[str], object]):
     original = sys.modules.get("eurlex")
-    package = SimpleNamespace(
-        prepend_prefixes=lambda query: query,
-        run_query=lambda query: run_query_result(query),
-    )
+    package = _FakeEurlexModule("eurlex")
+    package.prepend_prefixes = lambda query: query
+    package.run_query = lambda query: run_query_result(query)
     sys.modules["eurlex"] = package
     try:
         yield
@@ -47,7 +64,7 @@ def _patched_package(run_query_result):
             sys.modules["eurlex"] = original
 
 
-def run_example() -> dict[str, object]:
+def run_example() -> QueriesExampleResult:
     query = sparql.prepend_prefixes("SELECT ?name WHERE { ?person rdf:name ?name }")
     converted = sparql.convert_sparql_output_to_dataframe(
         {"results": {"bindings": [{"subject": {"value": "cdm:test"}}]}}
@@ -134,4 +151,4 @@ def run_example() -> dict[str, object]:
     }
 
 
-__all__ = ["run_example"]
+__all__ = ["QueriesExampleResult", "run_example"]

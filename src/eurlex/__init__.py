@@ -1,22 +1,8 @@
-"""Public package facade for the EUR-Lex parser."""
+"""Public package facade for the EUR-Lex parser.
 
-# ruff: noqa: F401,F403,F405
+Importing from `eurlex` stays supported for compatibility, while
+`eurlex.public` is the easiest module to inspect for the curated public API.
+"""
 
-import datetime
-
-import pandas as pd
-import rdflib
-import requests
-from defusedxml import (
-    ElementTree as ETree,  # nosec B405 - defusedxml hardens XML parsing
-)
-from SPARQLWrapper import JSON, SPARQLWrapper
-
-from .celex import *
-from .constants import *
-from .fetch import *
-from .language import *
-from .parser import *
-from .sparql import *
-from .uri import *
-from .xml import *
+from eurlex.public import *  # noqa: F401,F403
+from eurlex.public import __all__ as __all__

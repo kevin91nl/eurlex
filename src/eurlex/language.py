@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-from .constants import ISO2_TO_ISO3, ISO3_TO_ISO2
+from eurlex.constants import ISO2_TO_ISO3, ISO3_TO_ISO2
+
+_EMPTY_LANGUAGE = {"header": "", "query": "", "stream": ""}
 
 
-def _normalize_language(language: str) -> dict[str, str]:
+def _normalize_language(language: str | None) -> dict[str, str]:
     if not isinstance(language, str) or not language.strip():
-        return {"header": "", "query": "", "stream": ""}
+        return _EMPTY_LANGUAGE.copy()
 
-    lang = language.strip().lower()
-    if "-" in lang:
-        lang = lang.split("-")[0]
+    lang = language.strip().lower().split("-", 1)[0]
 
     if len(lang) == 2:
         return {

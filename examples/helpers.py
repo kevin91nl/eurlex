@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import TypedDict
 from xml.etree import ElementTree as ETree
 
 from eurlex.language import _normalize_language
@@ -12,7 +13,18 @@ from eurlex.xml import (
 )
 
 
-def run_example() -> dict[str, object]:
+class HelpersExampleResult(TypedDict):
+    prefixes: list[str]
+    language: dict[str, str]
+    url: str
+    iri: str
+    tag: str
+    classes: list[str]
+    has_class: bool
+    has_prefix: bool
+
+
+def run_example() -> HelpersExampleResult:
     node = ETree.fromstring('<p class="oj-normal oj-note"></p>')
     return {
         "prefixes": list(get_prefixes())[:2],
@@ -26,4 +38,4 @@ def run_example() -> dict[str, object]:
     }
 
 
-__all__ = ["run_example"]
+__all__ = ["HelpersExampleResult", "run_example"]

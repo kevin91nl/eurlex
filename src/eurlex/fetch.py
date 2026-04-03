@@ -4,8 +4,8 @@ import re
 
 import requests
 
-from .language import _normalize_language
-from .uri import _add_query_param
+from eurlex.language import _normalize_language
+from eurlex.uri import _add_query_param
 
 DEFAULT_REQUEST_TIMEOUT = 30
 

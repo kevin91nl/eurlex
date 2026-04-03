@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from typing import Any
 
 import pandas as pd
@@ -8,11 +9,27 @@ from defusedxml import (
     ElementTree as ETree,  # nosec B405 - defusedxml hardens XML parsing
 )
 
-from .xml import (
+from eurlex.markup import (
     _get_normalized_classes,
     _has_normalized_class,
     _has_normalized_class_prefix,
     get_tag_name,
+)
+
+_ArticleChildHandler = Callable[[Any, list, dict], list[dict[str, object]]]
+
+_PARAGRAPH_START_EXCLUSIONS = ("Done at", "It shall apply from")
+_PARAGRAPH_END_EXCLUSIONS = (
+    "is updated.",
+    "is deleted.",
+    "is removed.",
+    "is hereby repealed.",
+    "are updated.",
+    "are deleted.",
+    "are removed.",
+)
+_PARAGRAPH_CONTAINS_EXCLUSIONS = re.compile(
+    r"is replaced by|is amended |is repealed with|[‘’]"
 )
 
 
@@ -35,7 +52,7 @@ def _make_record(
 
 
 def parse_article_paragraphs(article: str) -> dict:
-    paragraphs = dict()
+    paragraphs: dict[str | None, list[str]] = {}
     paragraph = None
     article = article.replace("     ", "\n")
     for line in article.split("\n"):
@@ -48,13 +65,11 @@ def parse_article_paragraphs(article: str) -> dict:
             if match:
                 paragraph = match.group(0)
                 line = ")".join(line.split(")")[1:]).strip()
-        if paragraph not in paragraphs:
-            paragraphs[paragraph] = []
-        paragraphs[paragraph].append(line)
-    paragraphs = {
+        paragraphs.setdefault(paragraph, []).append(line)
+    paragraph_texts = {
         paragraph: "\n".join(paragraphs[paragraph]).strip() for paragraph in paragraphs
     }
-    return paragraphs
+    return paragraph_texts
 
 
 def parse_modifiers(
@@ -63,10 +78,19 @@ def parse_modifiers(
     ref = [] if ref is None else ref
     context = {} if context is None else context
     text = _get_text(child)
-    for modifier in ("italic", "signatory", "note"):
-        if _has_normalized_class(child, modifier):
-            return [_make_record(text, "text", ref, context, modifier=modifier)]
-    return []
+    modifier = next(
+        (
+            name
+            for name in ("italic", "signatory", "note")
+            if _has_normalized_class(child, name)
+        ),
+        None,
+    )
+    return (
+        [_make_record(text, "text", ref, context, modifier=modifier)]
+        if modifier is not None
+        else []
+    )
 
 
 def _get_text(child: Any) -> str:
@@ -118,7 +142,7 @@ def _parse_article_child(
     child: Any, ref: list, context: dict
 ) -> list[dict[str, object]]:
     tag = get_tag_name(child.tag)
-    handlers = {
+    handlers: dict[str, _ArticleChildHandler] = {
         "a": _parse_article_link,
         "p": _parse_paragraph,
         "span": parse_span,
@@ -127,11 +151,59 @@ def _parse_article_child(
         "body": parse_article,
     }
     handler = handlers.get(tag)
-    if handler is not None:
-        return handler(child, ref, context)
-    if tag in {"head", "hr"}:
-        return []
-    return []
+    return handler(child, ref, context) if handler is not None else []
+
+
+def _parse_span_doc_title(
+    text: str, ref: list, context: dict
+) -> list[dict[str, object]]:
+    context["document"] = context.get("document", "") + text
+    return [_make_record(text, "doc-title", ref, context)]
+
+
+def _parse_span_art_subtitle(
+    text: str, ref: list, context: dict
+) -> list[dict[str, object]]:
+    context["article_subtitle"] = text
+    return [_make_record(text, "art-subtitle", ref, context)]
+
+
+def _parse_span_art_title(
+    text: str, ref: list, context: dict
+) -> list[dict[str, object]]:
+    context["article"] = text.replace("Article", "").strip()
+    return [_make_record(text, "art-title", ref, context)]
+
+
+def _parse_span_group_title(
+    text: str, ref: list, context: dict
+) -> list[dict[str, object]]:
+    context["group"] = text
+    return [_make_record(text, "group-title", ref, context)]
+
+
+def _parse_span_section_title(
+    text: str, ref: list, context: dict
+) -> list[dict[str, object]]:
+    context["section"] = text
+    return [_make_record(text, "section-title", ref, context)]
+
+
+def _parse_span_normal(text: str, ref: list, context: dict) -> list[dict[str, object]]:
+    if re.match(r"^[0-9]+[.]", text):
+        context["paragraph"] = text.split(".")[0]
+        text = ".".join(text.split(".")[1:]).strip()
+    return [_make_record(text, "text", ref, context)]
+
+
+_SPAN_RULES = (
+    (_has_normalized_class, "doc-ti", _parse_span_doc_title),
+    (_has_normalized_class, "sti-art", _parse_span_art_subtitle),
+    (_has_normalized_class, "ti-art", _parse_span_art_title),
+    (_has_normalized_class_prefix, "ti-grseq-", _parse_span_group_title),
+    (_has_normalized_class_prefix, "ti-section-", _parse_span_section_title),
+    (_has_normalized_class, "normal", _parse_span_normal),
+)
 
 
 def parse_span(
@@ -139,35 +211,13 @@ def parse_span(
 ) -> list:
     ref = [] if ref is None else ref
     context = {} if context is None else context
-    output = []
     if "class" not in child.attrib:
-        return output
+        return []
     text = _get_text(child)
-    if _has_normalized_class(child, "doc-ti"):
-        if "document" not in context:
-            context["document"] = ""
-        context["document"] += text
-        output.append(_make_record(text, "doc-title", ref, context))
-    elif _has_normalized_class(child, "sti-art"):
-        context["article_subtitle"] = text
-        output.append(_make_record(text, "art-subtitle", ref, context))
-    elif _has_normalized_class(child, "ti-art"):
-        context["article"] = text.replace("Article", "").strip()
-        output.append(_make_record(text, "art-title", ref, context))
-    elif _has_normalized_class_prefix(child, "ti-grseq-"):
-        output.append(_make_record(text, "group-title", ref, context))
-        context["group"] = text
-    elif _has_normalized_class_prefix(child, "ti-section-"):
-        output.append(_make_record(text, "section-title", ref, context))
-        context["section"] = text
-    elif _has_normalized_class(child, "normal"):
-        if re.match("^[0-9]+[.]", text):
-            context["paragraph"] = text.split(".")[0]
-            text = ".".join(text.split(".")[1:]).strip()
-        output.append(_make_record(text, "text", ref, context))
-    else:
-        output.extend(parse_modifiers(child, ref, context))
-    return output
+    for predicate, class_name, handler in _SPAN_RULES:
+        if predicate(child, class_name):
+            return handler(text, ref, context)
+    return parse_modifiers(child, ref, context)
 
 
 def parse_article(
@@ -201,13 +251,10 @@ def parse_html(html: str) -> pd.DataFrame:
             tree = lxml_html.fromstring(html)
         except Exception:
             return pd.DataFrame()
-    records = []
-    for item in parse_article(tree):
-        for key, value in item["context"].items():
-            item[key] = value
-        records.append(item)
+    records = [{**item, **item["context"]} for item in parse_article(tree)]
     df = pd.DataFrame.from_records(records)
-    df = df[df.type == "text"] if "type" in df.columns else df
+    if "type" in df.columns:
+        return df.loc[df["type"] == "text"].copy()
     return df
 
 
@@ -217,36 +264,17 @@ def process_paragraphs(paragraphs: list) -> pd.DataFrame:
         return df_paragraphs
 
     paragraph_text = df_paragraphs.paragraph.astype(str)
-    startswith_exclusions = ("Done at", "It shall apply from")
-    endswith_exclusions = (
-        "is updated.",
-        "is deleted.",
-        "is removed.",
-        "is hereby repealed.",
-        "are updated.",
-        "are deleted.",
-        "are removed.",
-    )
-    contains_exclusions = (
-        "is replaced by",
-        "is amended ",
-        "is repealed with",
-        "‘",
-        "’",
+    include_mask = (
+        paragraph_text.str.endswith(".")
+        & paragraph_text.map(lambda text: str(text)[:1].isupper())
+        & (paragraph_text.str.len() >= 100)
+        & ~paragraph_text.str.startswith(_PARAGRAPH_START_EXCLUSIONS)
+        & ~paragraph_text.str.endswith(_PARAGRAPH_END_EXCLUSIONS)
+        & ~paragraph_text.str.contains(_PARAGRAPH_CONTAINS_EXCLUSIONS)
     )
 
-    include_mask = paragraph_text.str.endswith(".")
-    include_mask &= paragraph_text.apply(
-        lambda text: bool(text) and text[0].upper() == text[0]
-    )
-    include_mask &= paragraph_text.apply(len) >= 100
-    include_mask &= ~paragraph_text.str.startswith(startswith_exclusions)
-    include_mask &= ~paragraph_text.str.endswith(endswith_exclusions)
-    include_mask &= ~paragraph_text.str.contains(
-        "|".join(re.escape(token) for token in contains_exclusions)
-    )
-
-    return df_paragraphs[include_mask].drop_duplicates("paragraph")
+    filtered = df_paragraphs.loc[include_mask].copy()
+    return filtered.loc[~filtered["paragraph"].duplicated()].copy()
 
 
 __all__ = [

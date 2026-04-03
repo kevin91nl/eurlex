@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from .constants import PREFIXES
+from eurlex.constants import PREFIXES
 
 
 def get_prefixes() -> dict[str, str]:
