@@ -49,9 +49,6 @@ repos:
         name: import-cruiser (architecture graph)
         entry: import-cruiser export src/eurlex --format svg --show-loc --style depcruise --cluster-mode module --cluster-depth 1 --include-external-deps --output docs/architecture/dependency-graph.svg
         language: python
-        stages: [manual]
-        # Graphviz output is version-sensitive across CI/local environments.
-        # Run this hook manually when the architecture changes.
         additional_dependencies:
           - import-cruiser
         pass_filenames: false

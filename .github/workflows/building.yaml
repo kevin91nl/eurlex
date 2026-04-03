@@ -35,6 +35,8 @@ jobs:
                   python3 -m pip install --upgrade pre-commit
 
             - name: Run pre-commit hooks
+              env:
+                  SKIP: import-cruiser-architecture-graph
               run: |
                   pre-commit run --all-files --show-diff-on-failure
 
