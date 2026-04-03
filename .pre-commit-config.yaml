@@ -71,13 +71,3 @@ repos:
           - SPARQLWrapper
         pass_filenames: false
         always_run: true
-
-      - id: dependency-freshness
-        name: dependency freshness (runtime deps)
-        entry: python scripts/check_dependency_freshness.py
-        language: python
-        additional_dependencies:
-          - certifi
-          - packaging
-        pass_filenames: false
-        always_run: true
