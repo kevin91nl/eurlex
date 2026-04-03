@@ -111,9 +111,7 @@ def run_example() -> dict[str, object]:
     ):
         documents = sparql.get_documents(types=["REG"], limit=1)
 
-    with _patched_attr(
-        sparql, "run_query", lambda query: {"prefixed": query}
-    ):
+    with _patched_attr(sparql, "run_query", lambda query: {"prefixed": query}):
         original_package = sys.modules.pop("eurlex", None)
         try:
             fallback_prefixed_query = sparql._run_prefixed_query("SELECT ?x WHERE {}")

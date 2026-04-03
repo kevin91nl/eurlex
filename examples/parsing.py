@@ -33,7 +33,9 @@ def run_example() -> dict[str, object]:
     )
     no_modifier = parser.parse_modifiers(ETree.fromstring("<p class='plain'>Text</p>"))
     empty_processed = parser.process_paragraphs([]).empty
-    missing_column_processed = parser.process_paragraphs([{"celex_id": "1"}]).columns.tolist()
+    missing_column_processed = parser.process_paragraphs(
+        [{"celex_id": "1"}]
+    ).columns.tolist()
 
     return {
         "records": df.to_dict(orient="records"),
