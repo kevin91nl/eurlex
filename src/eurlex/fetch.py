@@ -6,8 +6,12 @@ import requests
 
 from .utils import _add_query_param, _normalize_language
 
+DEFAULT_REQUEST_TIMEOUT = 30
 
-def get_html_by_cellar_id(cellar_id: str, language: str = "en") -> str:
+
+def get_html_by_cellar_id(
+    cellar_id: str, language: str = "en", timeout: int | float = DEFAULT_REQUEST_TIMEOUT
+) -> str:
     lang = _normalize_language(language)
     url = "http://publications.europa.eu/resource/cellar/" + str(
         cellar_id.split(":")[1] if ":" in cellar_id else cellar_id
@@ -16,6 +20,7 @@ def get_html_by_cellar_id(cellar_id: str, language: str = "en") -> str:
     response = requests.get(
         url,
         allow_redirects=True,
+        timeout=timeout,
         headers={
             "Accept": "text/html,application/xhtml+xml,application/xml",
             "Accept-Language": f"{lang['header']}",
@@ -45,7 +50,7 @@ def _parse_multichoice_html(html: str) -> list:
             items.append({"href": href, "label": label, "name": name, "order": order})
         if items:
             return items
-    except Exception:
+    except Exception:  # nosec B110 - intentional fallback to a regex parser for malformed HTML
         pass
 
     pattern = re.compile(
@@ -99,13 +104,16 @@ def _select_multichoice_url(items: list, language: str = "en") -> str:
     return sorted(items, key=sort_key)[0].get("href", "")
 
 
-def get_html_by_celex_id(celex_id: str, language: str = "en") -> str:
+def get_html_by_celex_id(
+    celex_id: str, language: str = "en", timeout: int | float = DEFAULT_REQUEST_TIMEOUT
+) -> str:
     lang = _normalize_language(language)
     url = "http://publications.europa.eu/resource/celex/" + str(celex_id)
     url = _add_query_param(url, "language", lang["query"])
     response = requests.get(
         url,
         allow_redirects=True,
+        timeout=timeout,
         headers={
             "Accept": "text/html,application/xhtml+xml,application/xml",
             "Accept-Language": f"{lang['header']}",
@@ -120,6 +128,7 @@ def get_html_by_celex_id(celex_id: str, language: str = "en") -> str:
             response = requests.get(
                 selected,
                 allow_redirects=True,
+                timeout=timeout,
                 headers={
                     "Accept": "text/html,application/xhtml+xml,application/xml",
                     "Accept-Language": f"{lang['header']}",
@@ -134,4 +143,5 @@ __all__ = [
     "_parse_multichoice_html",
     "_select_multichoice_url",
     "get_html_by_celex_id",
+    "DEFAULT_REQUEST_TIMEOUT",
 ]

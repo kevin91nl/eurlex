@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import re
-from xml.etree import ElementTree as ETree
 
 import pandas as pd
+from defusedxml import (
+    ElementTree as ETree,  # nosec B405 - defusedxml hardens XML parsing
+)
 
 from .utils import (
     _get_normalized_classes,
@@ -80,7 +82,81 @@ def _get_text(child: ETree.Element) -> str:
     return "".join(child.itertext()).strip()
 
 
-def parse_span(child: ETree.Element, ref: list | None = None, context: dict | None = None) -> list:
+def _parse_article_link(
+    child: ETree.Element, ref: list, context: dict
+) -> list[dict[str, object]]:
+    return [
+        {
+            "text": _get_text(child),
+            "type": "link",
+            "ref": ref,
+            "context": context.copy(),
+        }
+    ]
+
+
+def _parse_article_text(
+    child: ETree.Element, ref: list, context: dict
+) -> list[dict[str, object]]:
+    text = "".join(child.itertext()).strip()
+    if not text:
+        return []
+    return [
+        {
+            "text": text,
+            "type": "text",
+            "ref": ref,
+            "context": context.copy(),
+        }
+    ]
+
+
+def _parse_article_table(
+    child: ETree.Element, ref: list, context: dict
+) -> list[dict[str, object]]:
+    namespaces = {"html": "http://www.w3.org/1999/xhtml"}
+    results = child.findall(
+        "html:tbody/html:tr/html:td", namespaces=namespaces
+    ) + child.findall("tbody/tr/td", namespaces=namespaces)
+    if not (
+        len(results) == 2
+        and len(results[0]) == 1
+        and get_tag_name(results[0][0].tag) == "p"
+    ):
+        return []
+
+    key = None
+    for subchild in results[0]:
+        key = _get_text(subchild)
+    return parse_article(results[1], ref + [key], context)
+
+
+def _parse_article_child(
+    child: ETree.Element, ref: list, context: dict
+) -> list[dict[str, object]]:
+    tag = get_tag_name(child.tag)
+    if tag == "a":
+        return _parse_article_link(child, ref, context)
+    if tag == "p":
+        if "class" in child.attrib:
+            return parse_span(child, ref, context)
+        return _parse_article_text(child, ref, context)
+    if tag == "span":
+        return parse_span(child, ref, context)
+    if tag == "table":
+        return _parse_article_table(child, ref, context)
+    if tag == "div":
+        return parse_article(child, ref, context)
+    if tag in ["head", "hr"]:
+        return []
+    if tag == "body":
+        return parse_article(child, ref, context)
+    return []
+
+
+def parse_span(
+    child: ETree.Element, ref: list | None = None, context: dict | None = None
+) -> list:
     ref = [] if ref is None else ref
     context = {} if context is None else context
     output = []
@@ -151,69 +227,30 @@ def parse_span(child: ETree.Element, ref: list | None = None, context: dict | No
     return output
 
 
-def parse_article(tree: ETree.Element, ref: list | None = None, context: dict | None = None) -> list:
-    namespaces = {"html": "http://www.w3.org/1999/xhtml"}
+def parse_article(
+    tree: ETree.Element, ref: list | None = None, context: dict | None = None
+) -> list:
     ref = [] if ref is None else ref
     context = {} if context is None else context
     output = []
-    new_context = context
     for child in tree:
-        if get_tag_name(child.tag) in ["a"]:
-            output.append(
-                {
-                    "text": _get_text(child),
-                    "type": "link",
-                    "ref": ref,
-                    "context": new_context.copy(),
-                }
-            )
-        elif get_tag_name(child.tag) == "p":
-            if "class" in child.attrib:
-                output.extend(parse_span(child, ref, new_context))
-            else:
-                text = "".join(child.itertext()).strip()
-                if text:
-                    output.append(
-                        {
-                            "text": text,
-                            "type": "text",
-                            "ref": ref,
-                            "context": new_context.copy(),
-                        }
-                    )
-        elif get_tag_name(child.tag) == "span":
-            output.extend(parse_span(child, ref, new_context))
-        elif get_tag_name(child.tag) == "table":
-            results = child.findall(
-                "html:tbody/html:tr/html:td", namespaces=namespaces
-            ) + child.findall("tbody/tr/td", namespaces=namespaces)
-            if (
-                len(results) == 2
-                and len(results[0]) == 1
-                and get_tag_name(results[0][0].tag) == "p"
-            ):
-                key = None
-                for subchild in results[0]:
-                    key = _get_text(subchild)
-                output.extend(parse_article(results[1], ref + [key], new_context))
-        elif get_tag_name(child.tag) == "div":
-            output.extend(parse_article(child, ref, new_context))
-        elif get_tag_name(child.tag) in ["head", "hr"]:
-            pass
-        elif get_tag_name(child.tag) == "body":
-            output.extend(parse_article(child, ref, context))
+        output.extend(_parse_article_child(child, ref, context))
     return output
 
 
 def parse_html(html: str) -> pd.DataFrame:
     tree = None
     try:
+        note_tag_pattern = (
+            r'<a[^>]*>\(<span class="(?:(?:oj-)?super) '
+            r'(?:(?:oj-)?note-tag)">([^<]*)</span>\)</a>'
+        )
         modified_html = re.sub(
-            r'<a[^>]*>\(<span class="(?:(?:oj-)?super) (?:(?:oj-)?note-tag)">([^<]*)</span>\)</a>',
+            note_tag_pattern,
             r"[LINK = \1]",
             html,
         )
-        tree = ETree.fromstring(modified_html)
+        tree = ETree.fromstring(modified_html)  # nosec B314 - XML is from EUR-Lex and validated via defusedxml/lxml fallback
     except ETree.ParseError:
         try:
             from lxml import html as lxml_html

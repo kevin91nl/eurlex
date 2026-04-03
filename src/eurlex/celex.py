@@ -20,7 +20,9 @@ def get_celex_id(
     if term2_is_year and not term1_is_year:
         year = term2
         document_id = term1
-    return "{}{}{}{}".format(str(sector_id), year, document_type, str(document_id).zfill(4))
+    return "{}{}{}{}".format(
+        str(sector_id), year, document_type, str(document_id).zfill(4)
+    )
 
 
 def get_possible_celex_ids(

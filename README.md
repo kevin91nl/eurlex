@@ -79,4 +79,6 @@ The final hook runs the doctests and enforces 100% coverage for `eurlex`, so you
 
 The README examples are also exercised automatically through `pytest-readme`, so they stay in sync with the code instead of becoming decorative fiction.
 
+CI tests the package on Python 3.11, 3.12, and 3.13, while the pre-commit hooks keep the code quality checks on a single pinned environment.
+
 Version tags that start with `v` — for example `v0.1.8` — now create a GitHub Release, attach the built distributions, and publish the package to PyPI after the checks pass.

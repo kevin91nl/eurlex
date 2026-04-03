@@ -1,3 +1,5 @@
+# ruff: noqa: E402,F401,F403,F405
+
 """Compatibility package that exposes the source-layout EUR-Lex modules.
 
 The repository uses a `src/` layout, but a legacy top-level `eurlex` package
@@ -11,24 +13,24 @@ from __future__ import annotations
 
 import datetime
 from pathlib import Path
+from xml.etree import ElementTree as ETree
 
 import pandas as pd
 import rdflib
 import requests
 from SPARQLWrapper import JSON, SPARQLWrapper
-from xml.etree import ElementTree as ETree
 
 _PACKAGE_DIR = Path(__file__).resolve().parent
 _SRC_PACKAGE_DIR = _PACKAGE_DIR.parent / "src" / "eurlex"
 
 __path__ = [str(_PACKAGE_DIR), str(_SRC_PACKAGE_DIR)]
 
-from .constants import *  # noqa: F401,F403
-from .utils import *  # noqa: F401,F403
 from .celex import *  # noqa: F401,F403
+from .constants import *  # noqa: F401,F403
 from .fetch import *  # noqa: F401,F403
 from .parser import *  # noqa: F401,F403
 from .sparql import *  # noqa: F401,F403
+from .utils import *  # noqa: F401,F403
 
 # Legacy module-level names used by the original monolithic package and by the
 # existing test suite's monkeypatches.

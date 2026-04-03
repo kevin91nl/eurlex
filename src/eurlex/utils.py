@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
-from xml.etree import ElementTree as ETree
+
+from defusedxml import (
+    ElementTree as ETree,  # nosec B405 - defusedxml hardens XML parsing
+)
 
 from .constants import ISO2_TO_ISO3, ISO3_TO_ISO2, PREFIXES
 
@@ -40,7 +43,9 @@ def _add_query_param(url: str, key: str, value: str) -> str:
     if query.get(key) == value:
         return url
     query[key] = value
-    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
+    return urlunsplit(
+        (parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment)
+    )
 
 
 def simplify_iri(iri: str) -> str:

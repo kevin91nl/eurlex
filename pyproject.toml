@@ -13,7 +13,8 @@ requires-python = ">=3.11"
 dependencies = [
 	"pandas~=3.0.1",
 	"rdflib~=7.6.0",
-	"requests~=2.32.5",
+	"defusedxml~=0.7.1",
+	"requests~=2.33.0",
 	"beautifulsoup4~=4.14.3",
 	"lxml~=6.0.2",
 	"SPARQLWrapper~=2.0.0",
@@ -28,10 +29,22 @@ dev = [
 	"pytest",
 	"pytest-cov",
 	"pytest-readme",
+	"defusedxml",
 ]
 
 [tool.pytest.ini_options]
 addopts = "--doctest-modules"
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "C90"]
+
+[tool.ruff.lint.per-file-ignores]
+"eurlex/__init__.py" = ["F401", "E402", "F403", "F405"]
+"src/eurlex/__init__.py" = ["F403", "F405"]
 
 [tool.setuptools]
 package-dir = { "" = "src" }

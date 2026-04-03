@@ -12,7 +12,10 @@ from .utils import get_prefixes, simplify_iri
 def prepend_prefixes(query: str) -> str:
     return (
         "\n".join(
-            ["prefix {}: <{}>".format(prefix, url) for prefix, url in get_prefixes().items()]
+            [
+                "prefix {}: <{}>".format(prefix, url)
+                for prefix, url in get_prefixes().items()
+            ]
         )
         + " "
         + query
@@ -40,9 +43,12 @@ def convert_sparql_output_to_dataframe(sparql_results: dict) -> pd.DataFrame:
 def get_celex_dataframe(celex_id: str) -> pd.DataFrame:
     graph = rdflib.Graph()
     results = graph.parse(
-        f"http://publications.europa.eu/resource/" f"celex/{str(celex_id)}?language=eng"
+        f"http://publications.europa.eu/resource/celex/{str(celex_id)}?language=eng"
     )
-    items = [{key: simplify_iri(str(item[key])) for key in range(len(item))} for item in results]
+    items = [
+        {key: simplify_iri(str(item[key])) for key in range(len(item))}
+        for item in results
+    ]
     df = pd.DataFrame(items)
     df.columns = ["s", "o", "p"]
     return df
@@ -86,15 +92,21 @@ def get_regulations(limit: int = -1, shuffle: bool = False) -> list:
     return cellar_ids
 
 
-def get_documents(types: List[str] = ["REG"], limit: int = -1) -> List[Dict[str, str]]:
+def get_documents(
+    types: List[str] | None = None, limit: int = -1
+) -> List[Dict[str, str]]:
     import eurlex as api
+
+    types = ["REG"] if types is None else types
 
     query = "select distinct ?doc ?type ?celex ?date\n"
     query += "where{ ?doc cdm:work_has_resource-type ?type.\n"
     query += "  FILTER(\n    "
     query += " ||\n    ".join(
         map(
-            lambda type: f"?type=<http://publications.europa.eu/resource/authority/resource-type/{type}>",
+            lambda type: (
+                f"?type=<http://publications.europa.eu/resource/authority/resource-type/{type}>"
+            ),
             types,
         )
     )

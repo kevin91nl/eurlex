@@ -4,8 +4,8 @@ on:
     workflow_dispatch:
 
 jobs:
-    tests:
-        name: Run Python Tests
+    quality:
+        name: Run Python Checks
         runs-on: ubuntu-latest
 
         steps:
@@ -38,9 +38,34 @@ jobs:
               run: |
                   pre-commit run --all-files --show-diff-on-failure
 
+    tests:
+        name: Test on Python ${{ matrix.python-version }}
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                python-version: ["3.11", "3.12", "3.13"]
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Set up Python ${{ matrix.python-version }}
+              uses: actions/setup-python@v5
+              with:
+                  python-version: ${{ matrix.python-version }}
+
+            - name: Install dependencies
+              run: |
+                  python -m pip install --upgrade pip
+                  python -m pip install --upgrade .[dev]
+
+            - name: Run tests
+              run: |
+                  pytest --doctest-modules --verbose
+
     release:
         name: Create GitHub Release and Publish to PyPI
-        needs: tests
+        needs: [quality, tests]
         if: github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
         runs-on: ubuntu-latest
         environment: pypi

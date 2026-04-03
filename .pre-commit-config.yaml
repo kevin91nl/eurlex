@@ -5,6 +5,43 @@ repos:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
+      - id: check-toml
+      - id: check-json
+      - id: check-ast
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: check-added-large-files
+        args: [--maxkb=200]
+      - id: detect-private-key
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.9
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.9.4
+    hooks:
+      - id: bandit
+        args: [-r, src/eurlex]
+        files: ^src/eurlex/
+        pass_filenames: false
+
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: [--baseline, .secrets.baseline]
+
+  - repo: https://github.com/pypa/pip-audit
+    rev: v2.10.0
+    hooks:
+      - id: pip-audit
+        args: [--strict, .]
+        pass_filenames: false
+        always_run: true
 
   - repo: local
     hooks:
@@ -25,11 +62,21 @@ repos:
           - pytest
           - pytest-cov
           - pytest-readme
+          - defusedxml
           - pandas
           - rdflib
           - requests
           - beautifulsoup4
           - lxml
           - SPARQLWrapper
+        pass_filenames: false
+        always_run: true
+
+      - id: dependency-freshness
+        name: dependency freshness (runtime deps)
+        entry: python scripts/check_dependency_freshness.py
+        language: python
+        additional_dependencies:
+          - packaging
         pass_filenames: false
         always_run: true
