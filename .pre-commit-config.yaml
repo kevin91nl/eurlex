@@ -77,6 +77,7 @@ repos:
         entry: python scripts/check_dependency_freshness.py
         language: python
         additional_dependencies:
+          - certifi
           - packaging
         pass_filenames: false
         always_run: true

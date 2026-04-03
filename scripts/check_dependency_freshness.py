@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import json
+import ssl
 import sys
+import tomllib
 import urllib.error
 import urllib.request
 from pathlib import Path
 
-import tomllib
+import certifi
 from packaging.requirements import Requirement
 from packaging.version import Version
 
@@ -20,7 +22,8 @@ def _load_runtime_requirements(pyproject_path: Path) -> list[Requirement]:
 def _latest_pypi_version(package_name: str) -> Version:
     url = f"https://pypi.org/pypi/{package_name}/json"
     request = urllib.request.Request(url, headers={"User-Agent": "eurlex-pre-commit"})
-    with urllib.request.urlopen(request, timeout=15) as response:
+    context = ssl.create_default_context(cafile=certifi.where())
+    with urllib.request.urlopen(request, timeout=15, context=context) as response:
         payload = json.load(response)
     return Version(payload["info"]["version"])
 
