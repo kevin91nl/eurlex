@@ -40,7 +40,7 @@ assert df_article_1_line_1.text == (
 
 Every document on EUR-Lex displays a CELEX number at the top of the page. More information on CELEX numbers can be found on the [EUR-Lex website](https://eur-lex.europa.eu/content/tools/eur-lex-celex-infographic-A3.pdf).
 
-For more information about the methods in this package, see the [unit tests](https://github.com/kevin91nl/eurlex/tree/main/tests) and [doctests](https://github.com/kevin91nl/eurlex/blob/main/eurlex/__init__.py).
+For more information about the methods in this package, see the [unit tests](https://github.com/kevin91nl/eurlex/tree/main/tests) and [doctests](https://github.com/kevin91nl/eurlex/blob/main/src/eurlex/__init__.py).
 
 ### Data Structure
 
