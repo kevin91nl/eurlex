@@ -78,3 +78,5 @@ pre-commit run --all-files
 The final hook runs the doctests and enforces 100% coverage for `eurlex`, so you should see the same failures locally before a commit lands.
 
 The README examples are also exercised automatically through `pytest-readme`, so they stay in sync with the code instead of becoming decorative fiction.
+
+Version tags that start with `v` — for example `v0.1.8` — now create a GitHub Release, attach the built distributions, and publish the package to PyPI after the checks pass.
