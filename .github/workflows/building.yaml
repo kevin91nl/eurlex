@@ -1,7 +1,8 @@
 name: CI
 on:
     push:
-    workflow_dispatch:
+        tags:
+            - "v*"
 
 jobs:
     quality:
@@ -87,7 +88,8 @@ jobs:
             - name: Check tag is on main
               id: main_branch
               run: |
-                  if git branch -r --contains "$GITHUB_SHA" | grep -q 'origin/main'; then
+                  git fetch origin main --depth=1
+                  if git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
                     echo "on_main=true" >> "$GITHUB_OUTPUT"
                   else
                     echo "on_main=false" >> "$GITHUB_OUTPUT"
