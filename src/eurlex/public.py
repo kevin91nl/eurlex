@@ -7,7 +7,6 @@ allowing the package root to stay tiny.
 from __future__ import annotations
 
 # ruff: noqa: F401
-
 import pandas as pd
 import rdflib
 import requests
