@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "eurlex"
+version = "0.1.7"
+description = "An EUR-Lex parser for Python."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "K.M.J. Jacobs", email = "kmj.jacobs@maastrichtuniversity.nl" }]
+requires-python = ">=3.11"
+dependencies = [
+	"pandas~=3.0.1",
+	"rdflib~=7.6.0",
+	"requests~=2.32.5",
+	"beautifulsoup4~=4.14.3",
+	"lxml~=6.0.2",
+	"SPARQLWrapper~=2.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/kevin91nl/eurlex"
+
+[project.optional-dependencies]
+dev = [
+	"pre-commit",
+	"pytest",
+	"pytest-cov",
+	"pytest-readme",
+]
+
+[tool.pytest.ini_options]
+addopts = "--doctest-modules"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]

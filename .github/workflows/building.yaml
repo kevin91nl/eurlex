@@ -18,19 +18,22 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install pytest
-        run: |
-          python3 -m pip install --upgrade pytest pytest-cov
+      - name: Cache pre-commit environments
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ runner.os }}-py312-${{ hashFiles('.pre-commit-config.yaml') }}
+          restore-keys: |
+            pre-commit-${{ runner.os }}-py312-
 
-      - name: Install Python dependencies
+      - name: Install pre-commit
         run: |
           python3 -m pip install --upgrade pip
-          pip3 install -r requirements.txt
+          python3 -m pip install --upgrade pre-commit
 
-      - name: Test with pytest
+      - name: Run pre-commit hooks
         run: |
-          pytest . --doctest-modules --exitfirst --verbose --failed-first \
-          --cov=eurlex --cov-report html --cov-fail-under=100
+          pre-commit run --all-files --show-diff-on-failure
 
   publish:
     name: Publish to PyPI

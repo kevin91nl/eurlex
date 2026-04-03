@@ -1,0 +1,35 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+
+  - repo: local
+    hooks:
+      - id: import-cruiser-architecture-graph
+        name: import-cruiser (architecture graph)
+        entry: import-cruiser export src/eurlex --format svg --show-loc --style depcruise --cluster-mode module --cluster-depth 1 --include-external-deps --output docs/architecture/dependency-graph.svg
+        language: python
+        additional_dependencies:
+          - import-cruiser
+        pass_filenames: false
+        always_run: true
+
+      - id: pytest-coverage
+        name: pytest (doctests + 100% coverage)
+        entry: python -m pytest . --doctest-modules --exitfirst --verbose --failed-first --cov=eurlex --cov-report term-missing --cov-fail-under=100
+        language: python
+        additional_dependencies:
+          - pytest
+          - pytest-cov
+          - pytest-readme
+          - pandas
+          - rdflib
+          - requests
+          - beautifulsoup4
+          - lxml
+          - SPARQLWrapper
+        pass_filenames: false
+        always_run: true
