@@ -1,6 +1,6 @@
-"""Compatibility re-export layer for the source-layout EUR-Lex package."""
+"""Public package facade for the EUR-Lex parser."""
 
-# ruff: noqa: E402,F401,F403,F405
+# ruff: noqa: F401,F403,F405
 
 import datetime
 
@@ -15,6 +15,8 @@ from SPARQLWrapper import JSON, SPARQLWrapper
 from .celex import *
 from .constants import *
 from .fetch import *
+from .language import *
 from .parser import *
 from .sparql import *
-from .utils import *
+from .uri import *
+from .xml import *

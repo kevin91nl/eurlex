@@ -4,9 +4,45 @@ import re
 
 import requests
 
-from .utils import _add_query_param, _normalize_language
+from .language import _normalize_language
+from .uri import _add_query_param
 
 DEFAULT_REQUEST_TIMEOUT = 30
+
+
+def _build_request_headers(language_header: str) -> dict[str, str]:
+    return {
+        "Accept": "text/html,application/xhtml+xml,application/xml",
+        "Accept-Language": language_header,
+    }
+
+
+def _get_html(url: str, language_header: str, timeout: int | float) -> tuple[str, int]:
+    response = requests.get(
+        url,
+        allow_redirects=True,
+        timeout=timeout,
+        headers=_build_request_headers(language_header),
+    )
+    return response.content.decode("utf-8"), response.status_code
+
+
+def _parse_optional_int(value: str | None) -> int | None:
+    try:
+        return int(value) if value else None
+    except ValueError:
+        return None
+
+
+def _build_multichoice_item(
+    href: str, label: str, name: str, order_text: str | None
+) -> dict[str, str | int | None]:
+    return {
+        "href": href,
+        "label": label,
+        "name": name,
+        "order": _parse_optional_int(order_text),
+    }
 
 
 def get_html_by_cellar_id(
@@ -17,16 +53,8 @@ def get_html_by_cellar_id(
         cellar_id.split(":")[1] if ":" in cellar_id else cellar_id
     )
     url = _add_query_param(url, "language", lang["query"])
-    response = requests.get(
-        url,
-        allow_redirects=True,
-        timeout=timeout,
-        headers={
-            "Accept": "text/html,application/xhtml+xml,application/xml",
-            "Accept-Language": f"{lang['header']}",
-        },
-    )
-    return response.content.decode("utf-8")
+    html, _ = _get_html(url, lang["header"], timeout)
+    return html
 
 
 def _parse_multichoice_html(html: str) -> list:
@@ -43,11 +71,7 @@ def _parse_multichoice_html(html: str) -> list:
             label = "".join(li.xpath(".//li[@title='stream_label']/text()"))
             name = "".join(li.xpath(".//li[@title='stream_name']/text()"))
             order_text = "".join(li.xpath(".//li[@title='stream_order']/text()"))
-            try:
-                order = int(order_text) if order_text else None
-            except ValueError:
-                order = None
-            items.append({"href": href, "label": label, "name": name, "order": order})
+            items.append(_build_multichoice_item(href, label, name, order_text))
         if items:
             return items
     except Exception:  # nosec B110 - intentional fallback to a regex parser for malformed HTML
@@ -61,18 +85,13 @@ def _parse_multichoice_html(html: str) -> list:
         re.DOTALL,
     )
     for match in pattern.finditer(html):
-        order_text = match.group("order")
-        try:
-            order = int(order_text) if order_text else None
-        except ValueError:
-            order = None
         items.append(
-            {
-                "href": match.group("href"),
-                "label": match.group("label"),
-                "name": match.group("name"),
-                "order": order,
-            }
+            _build_multichoice_item(
+                match.group("href"),
+                match.group("label"),
+                match.group("name"),
+                match.group("order"),
+            )
         )
     if items:
         return items
@@ -110,35 +129,21 @@ def get_html_by_celex_id(
     lang = _normalize_language(language)
     url = "http://publications.europa.eu/resource/celex/" + str(celex_id)
     url = _add_query_param(url, "language", lang["query"])
-    response = requests.get(
-        url,
-        allow_redirects=True,
-        timeout=timeout,
-        headers={
-            "Accept": "text/html,application/xhtml+xml,application/xml",
-            "Accept-Language": f"{lang['header']}",
-        },
-    )
-    html = response.content.decode("utf-8")
-    if response.status_code == 300 or "Multiple-Choice Response" in html:
+    html, status_code = _get_html(url, lang["header"], timeout)
+    if status_code == 300 or "Multiple-Choice Response" in html:
         items = _parse_multichoice_html(html)
         selected = _select_multichoice_url(items, language=language)
         if selected:
             selected = _add_query_param(selected, "language", lang["query"])
-            response = requests.get(
-                selected,
-                allow_redirects=True,
-                timeout=timeout,
-                headers={
-                    "Accept": "text/html,application/xhtml+xml,application/xml",
-                    "Accept-Language": f"{lang['header']}",
-                },
-            )
-            html = response.content.decode("utf-8")
+            html, _ = _get_html(selected, lang["header"], timeout)
     return html
 
 
 __all__ = [
+    "_build_request_headers",
+    "_get_html",
+    "_parse_optional_int",
+    "_build_multichoice_item",
     "get_html_by_cellar_id",
     "_parse_multichoice_html",
     "_select_multichoice_url",

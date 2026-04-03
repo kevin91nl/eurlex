@@ -1,18 +1,37 @@
 from __future__ import annotations
 
 import re
+from typing import Any
 
 import pandas as pd
 from defusedxml import (
     ElementTree as ETree,  # nosec B405 - defusedxml hardens XML parsing
 )
 
-from .utils import (
+from .xml import (
     _get_normalized_classes,
     _has_normalized_class,
     _has_normalized_class_prefix,
     get_tag_name,
 )
+
+
+def _make_record(
+    text: str,
+    record_type: str,
+    ref: list,
+    context: dict,
+    modifier: str | None = None,
+) -> dict[str, object]:
+    record: dict[str, object] = {
+        "text": text,
+        "type": record_type,
+        "ref": ref,
+        "context": context.copy(),
+    }
+    if modifier is not None:
+        record["modifier"] = modifier
+    return record
 
 
 def parse_article_paragraphs(article: str) -> dict:
@@ -39,80 +58,44 @@ def parse_article_paragraphs(article: str) -> dict:
 
 
 def parse_modifiers(
-    child: ETree.Element, ref: list | None = None, context: dict | None = None
+    child: Any, ref: list | None = None, context: dict | None = None
 ) -> list:
     ref = [] if ref is None else ref
     context = {} if context is None else context
-    output = []
-    new_context = context.copy()
-    if _has_normalized_class(child, "italic"):
-        output.append(
-            {
-                "text": _get_text(child),
-                "type": "text",
-                "modifier": "italic",
-                "ref": ref,
-                "context": new_context.copy(),
-            }
-        )
-    elif _has_normalized_class(child, "signatory"):
-        output.append(
-            {
-                "text": _get_text(child),
-                "type": "text",
-                "modifier": "signatory",
-                "ref": ref,
-                "context": new_context.copy(),
-            }
-        )
-    elif _has_normalized_class(child, "note"):
-        output.append(
-            {
-                "text": _get_text(child),
-                "type": "text",
-                "modifier": "note",
-                "ref": ref,
-                "context": new_context.copy(),
-            }
-        )
-    return output
+    text = _get_text(child)
+    for modifier in ("italic", "signatory", "note"):
+        if _has_normalized_class(child, modifier):
+            return [_make_record(text, "text", ref, context, modifier=modifier)]
+    return []
 
 
-def _get_text(child: ETree.Element) -> str:
+def _get_text(child: Any) -> str:
     return "".join(child.itertext()).strip()
 
 
 def _parse_article_link(
-    child: ETree.Element, ref: list, context: dict
+    child: Any, ref: list, context: dict
 ) -> list[dict[str, object]]:
-    return [
-        {
-            "text": _get_text(child),
-            "type": "link",
-            "ref": ref,
-            "context": context.copy(),
-        }
-    ]
+    return [_make_record(_get_text(child), "link", ref, context)]
 
 
 def _parse_article_text(
-    child: ETree.Element, ref: list, context: dict
+    child: Any, ref: list, context: dict
 ) -> list[dict[str, object]]:
-    text = "".join(child.itertext()).strip()
+    text = _get_text(child)
     if not text:
         return []
-    return [
-        {
-            "text": text,
-            "type": "text",
-            "ref": ref,
-            "context": context.copy(),
-        }
-    ]
+    return [_make_record(text, "text", ref, context)]
+
+
+def _parse_paragraph(child: Any, ref: list, context: dict) -> list[dict[str, object]]:
+    if "class" in child.attrib:
+        return parse_span(child, ref, context)
+    return _parse_article_text(child, ref, context)
 
 
 def _parse_article_table(
-    child: ETree.Element, ref: list, context: dict
+    child: Any, ref: list, context: dict
 ) -> list[dict[str, object]]:
     namespaces = {"html": "http://www.w3.org/1999/xhtml"}
     results = child.findall(
@@ -132,103 +115,63 @@ def _parse_article_table(
 
 
 def _parse_article_child(
-    child: ETree.Element, ref: list, context: dict
+    child: Any, ref: list, context: dict
 ) -> list[dict[str, object]]:
     tag = get_tag_name(child.tag)
-    if tag == "a":
-        return _parse_article_link(child, ref, context)
-    if tag == "p":
-        if "class" in child.attrib:
-            return parse_span(child, ref, context)
-        return _parse_article_text(child, ref, context)
-    if tag == "span":
-        return parse_span(child, ref, context)
-    if tag == "table":
-        return _parse_article_table(child, ref, context)
-    if tag == "div":
-        return parse_article(child, ref, context)
-    if tag in ["head", "hr"]:
+    handlers = {
+        "a": _parse_article_link,
+        "p": _parse_paragraph,
+        "span": parse_span,
+        "table": _parse_article_table,
+        "div": parse_article,
+        "body": parse_article,
+    }
+    handler = handlers.get(tag)
+    if handler is not None:
+        return handler(child, ref, context)
+    if tag in {"head", "hr"}:
         return []
-    if tag == "body":
-        return parse_article(child, ref, context)
     return []
 
 
 def parse_span(
-    child: ETree.Element, ref: list | None = None, context: dict | None = None
+    child: Any, ref: list | None = None, context: dict | None = None
 ) -> list:
     ref = [] if ref is None else ref
     context = {} if context is None else context
     output = []
     if "class" not in child.attrib:
         return output
+    text = _get_text(child)
     if _has_normalized_class(child, "doc-ti"):
         if "document" not in context:
             context["document"] = ""
-        context["document"] += _get_text(child)
-        output.append(
-            {
-                "text": _get_text(child),
-                "type": "doc-title",
-                "ref": ref,
-                "context": context.copy(),
-            }
-        )
+        context["document"] += text
+        output.append(_make_record(text, "doc-title", ref, context))
     elif _has_normalized_class(child, "sti-art"):
-        context["article_subtitle"] = _get_text(child)
-        output.append(
-            {
-                "text": _get_text(child),
-                "type": "art-subtitle",
-                "ref": ref,
-                "context": context.copy(),
-            }
-        )
+        context["article_subtitle"] = text
+        output.append(_make_record(text, "art-subtitle", ref, context))
     elif _has_normalized_class(child, "ti-art"):
-        context["article"] = _get_text(child).replace("Article", "").strip()
-        output.append(
-            {
-                "text": _get_text(child),
-                "type": "art-title",
-                "ref": ref,
-                "context": context.copy(),
-            }
-        )
+        context["article"] = text.replace("Article", "").strip()
+        output.append(_make_record(text, "art-title", ref, context))
     elif _has_normalized_class_prefix(child, "ti-grseq-"):
-        output.append(
-            {
-                "text": _get_text(child),
-                "type": "group-title",
-                "ref": ref,
-                "context": context.copy(),
-            }
-        )
-        context["group"] = _get_text(child)
+        output.append(_make_record(text, "group-title", ref, context))
+        context["group"] = text
     elif _has_normalized_class_prefix(child, "ti-section-"):
-        output.append(
-            {
-                "text": _get_text(child),
-                "type": "section-title",
-                "ref": ref,
-                "context": context.copy(),
-            }
-        )
-        context["section"] = _get_text(child)
+        output.append(_make_record(text, "section-title", ref, context))
+        context["section"] = text
     elif _has_normalized_class(child, "normal"):
-        text = _get_text(child)
         if re.match("^[0-9]+[.]", text):
             context["paragraph"] = text.split(".")[0]
             text = ".".join(text.split(".")[1:]).strip()
-        output.append(
-            {"text": text, "type": "text", "ref": ref, "context": context.copy()}
-        )
+        output.append(_make_record(text, "text", ref, context))
     else:
         output.extend(parse_modifiers(child, ref, context))
     return output
 
 
 def parse_article(
-    tree: ETree.Element, ref: list | None = None, context: dict | None = None
+    tree: Any, ref: list | None = None, context: dict | None = None
 ) -> list:
     ref = [] if ref is None else ref
     context = {} if context is None else context
@@ -270,101 +213,40 @@ def parse_html(html: str) -> pd.DataFrame:
 
 def process_paragraphs(paragraphs: list) -> pd.DataFrame:
     df_paragraphs = pd.DataFrame.from_records(paragraphs)
-    if "paragraph" not in df_paragraphs.columns:
+    if "paragraph" not in df_paragraphs.columns or df_paragraphs.empty:
         return df_paragraphs
-    df_paragraphs = (
-        df_paragraphs[~df_paragraphs.paragraph.str.startswith("Done at")]
-        if len(df_paragraphs)
-        else df_paragraphs
+
+    paragraph_text = df_paragraphs.paragraph.astype(str)
+    startswith_exclusions = ("Done at", "It shall apply from")
+    endswith_exclusions = (
+        "is updated.",
+        "is deleted.",
+        "is removed.",
+        "is hereby repealed.",
+        "are updated.",
+        "are deleted.",
+        "are removed.",
     )
-    df_paragraphs = (
-        df_paragraphs[~df_paragraphs.paragraph.str.startswith("It shall apply from")]
-        if len(df_paragraphs)
-        else df_paragraphs
+    contains_exclusions = (
+        "is replaced by",
+        "is amended ",
+        "is repealed with",
+        "‘",
+        "’",
     )
-    df_paragraphs = (
-        df_paragraphs[~df_paragraphs.paragraph.str.contains("is replaced by")]
-        if len(df_paragraphs)
-        else df_paragraphs
+
+    include_mask = paragraph_text.str.endswith(".")
+    include_mask &= paragraph_text.apply(
+        lambda text: bool(text) and text[0].upper() == text[0]
     )
-    df_paragraphs = (
-        df_paragraphs[~df_paragraphs.paragraph.str.endswith("is updated.")]
-        if len(df_paragraphs)
-        else df_paragraphs
+    include_mask &= paragraph_text.apply(len) >= 100
+    include_mask &= ~paragraph_text.str.startswith(startswith_exclusions)
+    include_mask &= ~paragraph_text.str.endswith(endswith_exclusions)
+    include_mask &= ~paragraph_text.str.contains(
+        "|".join(re.escape(token) for token in contains_exclusions)
     )
-    df_paragraphs = (
-        df_paragraphs[~df_paragraphs.paragraph.str.endswith("is deleted.")]
-        if len(df_paragraphs)
-        else df_paragraphs
-    )
-    df_paragraphs = (
-        df_paragraphs[~df_paragraphs.paragraph.str.endswith("is removed.")]
-        if len(df_paragraphs)
-        else df_paragraphs
-    )
-    df_paragraphs = (
-        df_paragraphs[~df_paragraphs.paragraph.str.endswith("is hereby repealed.")]
-        if len(df_paragraphs)
-        else df_paragraphs
-    )
-    df_paragraphs = (
-        df_paragraphs[~df_paragraphs.paragraph.str.endswith("are updated.")]
-        if len(df_paragraphs)
-        else df_paragraphs
-    )
-    df_paragraphs = (
-        df_paragraphs[~df_paragraphs.paragraph.str.endswith("are deleted.")]
-        if len(df_paragraphs)
-        else df_paragraphs
-    )
-    df_paragraphs = (
-        df_paragraphs[~df_paragraphs.paragraph.str.endswith("are removed.")]
-        if len(df_paragraphs)
-        else df_paragraphs
-    )
-    df_paragraphs = (
-        df_paragraphs[~df_paragraphs.paragraph.str.contains("is amended ")]
-        if len(df_paragraphs)
-        else df_paragraphs
-    )
-    df_paragraphs = (
-        df_paragraphs[~df_paragraphs.paragraph.str.contains("is repealed with")]
-        if len(df_paragraphs)
-        else df_paragraphs
-    )
-    df_paragraphs = (
-        df_paragraphs[df_paragraphs.paragraph.str.endswith(".")]
-        if len(df_paragraphs)
-        else df_paragraphs
-    )
-    df_paragraphs = (
-        df_paragraphs[
-            df_paragraphs.paragraph.apply(lambda text: text[0].upper() == text[0])
-        ]
-        if len(df_paragraphs)
-        else df_paragraphs
-    )
-    df_paragraphs = (
-        df_paragraphs[~df_paragraphs.paragraph.str.contains("‘")]
-        if len(df_paragraphs)
-        else df_paragraphs
-    )
-    df_paragraphs = (
-        df_paragraphs[~df_paragraphs.paragraph.str.contains("’")]
-        if len(df_paragraphs)
-        else df_paragraphs
-    )
-    df_paragraphs = (
-        df_paragraphs[df_paragraphs.paragraph.apply(len) >= 100]
-        if len(df_paragraphs)
-        else df_paragraphs
-    )
-    df_paragraphs = (
-        df_paragraphs.drop_duplicates("paragraph")
-        if len(df_paragraphs)
-        else df_paragraphs
-    )
-    return df_paragraphs
+
+    return df_paragraphs[include_mask].drop_duplicates("paragraph")
 
 
 __all__ = [

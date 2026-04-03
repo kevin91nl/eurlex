@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import sys
 from typing import Any, Dict, List
 
 import pandas as pd
 import rdflib
 
 from .celex import get_possible_celex_ids
-from .utils import get_prefixes, simplify_iri
+from .uri import get_prefixes, simplify_iri
 
 
 def prepend_prefixes(query: str) -> str:
@@ -20,6 +21,17 @@ def prepend_prefixes(query: str) -> str:
         + " "
         + query
     )
+
+
+def _run_prefixed_query(query: str) -> Any:
+    package = sys.modules.get("eurlex")
+    if package is not None:
+        return package.run_query(package.prepend_prefixes(query).strip())
+    return run_query(prepend_prefixes(query).strip())
+
+
+def _binding_value(binding: dict, key: str) -> str:
+    return binding[key]["value"]
 
 
 def run_query(query: str) -> Any:
@@ -57,46 +69,39 @@ def get_celex_dataframe(celex_id: str) -> pd.DataFrame:
 def guess_celex_ids_via_eurlex(
     slash_notation: str, document_type: str | None = None, sector_id: str | None = None
 ) -> list:
-    import eurlex as api
-
     slash_notation = "/".join(slash_notation.split("/")[:2])
     queries = [
         "{ ?s owl:sameAs celex:" + celex_id + " . ?s owl:sameAs ?o }"
         for celex_id in get_possible_celex_ids(slash_notation, document_type, sector_id)
     ]
     query = "SELECT * WHERE {" + " UNION ".join(queries) + "}"
-    query = api.prepend_prefixes(query)
-    results = api.run_query(query.strip())
+    results = _run_prefixed_query(query)
     celex_ids = []
     for binding in results["results"]["bindings"]:
-        if "/celex/" in binding["o"]["value"]:
-            celex_id = binding["o"]["value"].split("/")[-1]
-            celex_ids.append(celex_id)
+        value = _binding_value(binding, "o")
+        if "/celex/" in value:
+            celex_ids.append(value.split("/")[-1])
     celex_ids = list(set(celex_ids))
     return celex_ids
 
 
 def get_regulations(limit: int = -1, shuffle: bool = False) -> list:
-    import eurlex as api
-
     query = "select ?doc where {?doc cdm:work_has_resource-type <http://publications.europa.eu/"
     query += (
         "resource/authority/resource-type/REG_IMPL> . }"
         + (" order by rand()" if shuffle else "")
         + (" limit " + str(limit) if limit > 0 else "")
     )
-    results = api.run_query(api.prepend_prefixes(query))
+    results = _run_prefixed_query(query)
     cellar_ids = []
     for result in results["results"]["bindings"]:
-        cellar_ids.append(result["doc"]["value"].split("/")[-1])
+        cellar_ids.append(_binding_value(result, "doc").split("/")[-1])
     return cellar_ids
 
 
 def get_documents(
     types: List[str] | None = None, limit: int = -1
 ) -> List[Dict[str, str]]:
-    import eurlex as api
-
     types = ["REG"] if types is None else types
 
     query = "select distinct ?doc ?type ?celex ?date\n"
@@ -119,15 +124,15 @@ def get_documents(
         query += "limit " + str(limit)
 
     results = []
-    query_results = api.run_query(api.prepend_prefixes(query))
+    query_results = _run_prefixed_query(query)
 
     for result in query_results["results"]["bindings"]:
         results.append(
             {
-                "celex": result["celex"]["value"],
-                "date": result["date"]["value"],
-                "link": result["doc"]["value"],
-                "type": result["type"]["value"].split("/")[-1],
+                "celex": _binding_value(result, "celex"),
+                "date": _binding_value(result, "date"),
+                "link": _binding_value(result, "doc"),
+                "type": _binding_value(result, "type").split("/")[-1],
             }
         )
 
