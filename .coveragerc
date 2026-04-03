@@ -1,2 +1,5 @@
 [run]
-omit = setup.py
+source =
+	src/eurlex
+	examples
+omit =

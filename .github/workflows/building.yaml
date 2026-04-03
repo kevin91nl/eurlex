@@ -1,58 +1,113 @@
 name: CI
 on:
-  push:
-  workflow_dispatch:
-  release:
-    types: [published]
+    push:
+    workflow_dispatch:
 
 jobs:
-  tests:
-    name: Run Python Tests
-    runs-on: ubuntu-latest
+    quality:
+        name: Run Python Checks
+        runs-on: ubuntu-latest
 
-    steps:
-      - uses: actions/checkout@v4
+        steps:
+            - uses: actions/checkout@v4
 
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
+            - name: Set up Python 3.12
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.12"
 
-      - name: Install pytest
-        run: |
-          python3 -m pip install --upgrade pytest pytest-cov
+            - name: Install Graphviz
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y graphviz
 
-      - name: Install Python dependencies
-        run: |
-          python3 -m pip install --upgrade pip
-          pip3 install -r requirements.txt
+            - name: Cache pre-commit environments
+              uses: actions/cache@v4
+              with:
+                  path: ~/.cache/pre-commit
+                  key: pre-commit-${{ runner.os }}-py312-${{ hashFiles('.pre-commit-config.yaml') }}
+                  restore-keys: |
+                      pre-commit-${{ runner.os }}-py312-
 
-      - name: Test with pytest
-        run: |
-          pytest . --doctest-modules --exitfirst --verbose --failed-first \
-          --cov=eurlex --cov-report html --cov-fail-under=100
+            - name: Install pre-commit
+              run: |
+                  python3 -m pip install --upgrade pip
+                  python3 -m pip install --upgrade pre-commit
 
-  publish:
-    name: Publish to PyPI
-    needs: tests
-    if: github.event_name == 'release' && github.event.action == 'published'
-    runs-on: ubuntu-latest
-    environment: pypi
-    permissions:
-      id-token: write
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
+            - name: Run pre-commit hooks
+              env:
+                  SKIP: import-cruiser-architecture-graph
+              run: |
+                  pre-commit run --all-files --show-diff-on-failure
 
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
+    tests:
+        name: Test on Python ${{ matrix.python-version }}
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                python-version: ["3.11", "3.12", "3.13"]
 
-      - name: Build distributions
-        run: |
-          python -m pip install --upgrade build
-          python -m build
+        steps:
+            - uses: actions/checkout@v4
 
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+            - name: Set up Python ${{ matrix.python-version }}
+              uses: actions/setup-python@v5
+              with:
+                  python-version: ${{ matrix.python-version }}
+
+            - name: Install dependencies
+              run: |
+                  python -m pip install --upgrade pip
+                  python -m pip install --upgrade .[dev]
+
+            - name: Run tests
+              run: |
+                  pytest --doctest-modules --verbose
+
+    release:
+        name: Create GitHub Release and Publish to PyPI
+        needs: [quality, tests]
+        if: github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
+        runs-on: ubuntu-latest
+        environment: pypi
+        permissions:
+            contents: write
+            id-token: write
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Set up Python 3.12
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.12"
+
+            - name: Check tag is on main
+              id: main_branch
+              run: |
+                  if git branch -r --contains "$GITHUB_SHA" | grep -q 'origin/main'; then
+                    echo "on_main=true" >> "$GITHUB_OUTPUT"
+                  else
+                    echo "on_main=false" >> "$GITHUB_OUTPUT"
+                  fi
+
+            - name: Build distributions
+              if: steps.main_branch.outputs.on_main == 'true'
+              run: |
+                  python -m pip install --upgrade build
+                  python -m build
+
+            - name: Create GitHub Release
+              if: steps.main_branch.outputs.on_main == 'true'
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: ${{ github.ref_name }}
+                  name: ${{ github.ref_name }}
+                  generate_release_notes: true
+                  files: dist/*
+
+            - name: Publish to PyPI
+              if: steps.main_branch.outputs.on_main == 'true'
+              uses: pypa/gh-action-pypi-publish@release/v1
